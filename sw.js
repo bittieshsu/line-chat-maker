@@ -1,5 +1,5 @@
 // ponytail: 全量 precache、cache-first、ignoreSearch —— 照 yazelin PWA 離線守則
-const CACHE = 'lcm-v123';
+const CACHE = 'lcm-v124';
 const ASSETS = ['./', 'index.html', 'style.css', 'skin.js', 'pure.js', 'app.js', 'ai.js', 'presets.json', 'vendor/html2canvas.min.js', 'vendor/mp4-muxer.min.js', 'verify.html', 'demo.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png'];
 self.addEventListener('install', (e) => { e.waitUntil(caches.open(CACHE).then((c) => c.addAll(ASSETS)).then(() => self.skipWaiting())); });
 // 只清自己的 lcm-*:CacheStorage 是 per-origin,yazelin.github.io 所有專案共用同一份,無差別刪會清掉別站的離線包

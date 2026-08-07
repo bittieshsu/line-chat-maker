@@ -124,6 +124,9 @@ body.dark .footer .footer-icon:hover { color: var(--accent); }
 .chat-addbar { display: flex; flex-wrap: wrap; gap: 4px; padding: 6px 8px; justify-content: center; max-width: 24rem; }
 .chat-addbar button { border: 1px solid var(--border); background: #fff; border-radius: 999px; font-size: 0.72rem; padding: 0.15rem 0.6rem; cursor: pointer; color: #555; }
 .chat-addbar button:hover { border-color: var(--accent); color: var(--accent); }
+.addbar-hint { max-width: 24rem; text-align: center; margin: 0 0 6px; padding: 0 8px; }
+.addbar-hint a { color: var(--accent); }
+body.previewing .addbar-hint { display: none; }
 
 /* 輸入框草稿:空的時候顯示 Aa 佔位 */
 .inputbar .fakein:empty::before { content: attr(data-ph); color: #999; }
