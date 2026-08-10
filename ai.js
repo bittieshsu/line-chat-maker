@@ -139,6 +139,10 @@ schema 重點:
 // ── 編劇/評審(創意與執行分離:編劇寫劇本→評審打分及格→執行 AI 只負責詳實填入) ──
 const WRITER_SYSTEM = `你是資深編劇,專為「LINE 對話截圖」這種形式寫劇本。
 
+【篇幅】
+**總長 40 則訊息以內**(含日期分隔與「(略)」),甜蜜點是 20 到 30 則。這不是美學偏好:執行 AI 每批只能填 8 則、每批要花掉數輪迴圈,劇本超過 40 則就會做到一半停住,使用者只看得到半成品。
+寫太長也不好看——一張截圖滑不完,梗會被稀釋。要讓劇情變好就砍掉鋪陳、讓每一則更有力,不要靠加長。
+
 【演出管線】
 你的劇本不會被人類觀眾讀到,而是交給一個「執行 AI」逐字轉譯成一張 LINE 風格的對話畫面——觀眾最後看到的只有那張圖。
 這個舞台沒有旁白、沒有內心獨白、沒有場景與鏡頭描寫、沒有表情動作說明;所有情緒與劇情,只能用「畫面上真的看得到的東西」演出來。這是 show, don't tell 的 LINE 版——寫任何一行前先問:這個東西會出現在截圖上嗎?不會,就換成畫面演得出來的手法。
@@ -253,7 +257,7 @@ async function chat(msgs, force, noTools, useCfg) {
 function textOf(m) { return (typeof m.content === 'string' ? m.content : '').trim(); }
 
 function writerBrief(prompt, existing) { // 編劇的 user 訊息;內建「劇本強化」與「複製 prompt 外部產生」共用同一份,避免漂移
-  return '需求:' + prompt + (existing ? '\n\n既有劇本(在此基礎上強化:保留好的部分、針對需求與弱點改寫,輸出完整新版):\n' + existing : '');
+  return '需求:' + prompt + (existing ? '\n\n既有劇本(在此基礎上強化:保留好的部分、針對需求與弱點改寫,輸出完整新版。**強化是讓每一則更有力,不是把劇本加長**;該砍的鋪陳就砍掉,總長仍要控制在 40 則以內):\n' + existing : '');
 }
 async function writeScreenplay(prompt, existing) { // 編劇→評審迴圈,及格(或 3 輪取最佳)才放行
   log('編劇撰寫劇本中…');
@@ -300,7 +304,7 @@ async function runAgent(prompt, screenplay, quick) {
     { role: 'system', content: SYSTEM },
     { role: 'user', content: '目前腳本 JSON:\n' + JSON.stringify(strip(scriptOf())) + '\n\n' + task },
   ];
-  const loopLimit = Math.min(50, Math.max(3, +cfg().loops || 15)); // 每按一次「開始製作」重新起算
+  const loopLimit = Math.min(60, Math.max(3, +cfg().loops || 30)); // 每按一次「開始製作」重新起算;預設 30 約可做 80 則,只吃掉一半每日額度,留一半給微調與重試
   let allowForce = true; // 推理模型偶爾在 required 下硬回文字,Groq 直接 400;降級 auto+反偷懶訊息驅動
   try {
     for (let step = 1; step <= loopLimit; step++) {
@@ -711,7 +715,7 @@ window.lcmRegenImage = async (msgIndex) => { // 單格重生(app.js 的 hover �
 };
 
 // 劇本跟著草稿走(localStorage per draft id,不進 state:分享連結與匯出不帶劇本)
-function screenplayLoad() { try { $('#ai-screenplay-text').value = localStorage.getItem('lcm-screenplay-' + currentId) || ''; } catch (e) {} }
+function screenplayLoad() { try { $('#ai-screenplay-text').value = localStorage.getItem('lcm-screenplay-' + currentId) || ''; } catch (e) {} screenplayCount(); }
 function screenplaySave() { try { localStorage.setItem('lcm-screenplay-' + currentId, $('#ai-screenplay-text').value); } catch (e) {} }
 function fillCfgForm() {
   const c = cfg();
@@ -721,7 +725,7 @@ function fillCfgForm() {
   $('#ai-base').value = c.base || '';
   $('#ai-model').value = c.model || '';
   $('#ai-key').value = c.key || '';
-  $('#ai-loops').value = Math.min(50, Math.max(3, +c.loops || 15));
+  $('#ai-loops').value = Math.min(60, Math.max(3, +c.loops || 30));
   const wsel = $('#ai-w-provider');
   if (!wsel.options.length) {
     const same = document.createElement('option'); same.value = ''; same.textContent = '同執行設定'; wsel.appendChild(same);
@@ -788,7 +792,7 @@ $('#ai-enhance').addEventListener('click', async () => { // 第 1 段:發想與�
   aborter = new AbortController();
   try {
     const s = await writeScreenplay(prompt || '把既有劇本整體強化', existing);
-    if (s) { $('#ai-screenplay-text').value = s; screenplaySave(); log('劇本已更新:可直接編輯、再按「劇本強化」迭代;滿意就按「開始製作」。', 'done'); }
+    if (s) { $('#ai-screenplay-text').value = s; screenplaySave(); screenplayCount(); log('劇本已更新:可直接編輯、再按「劇本強化」迭代;滿意就按「開始製作」。', 'done'); }
   } catch (e) { log(e.name === 'AbortError' ? '已停止。' : '失敗:' + e.message, 'err'); }
   aborter = null;
   setBusy(false);
@@ -833,7 +837,18 @@ $('#ai-quick-run').addEventListener('click', async () => { // 微調:直接下�
   refreshQuota();
 });
 $('#ai-quick').addEventListener('keydown', (e) => { if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) $('#ai-quick-run').click(); });
-$('#ai-screenplay-text').addEventListener('input', screenplaySave);
+function screenplayCount() { // 讓使用者看得見劇本長度:超過 40 則執行端會做不完,現在只會停在一半
+  const el2 = $('#ai-screenplay-count');
+  if (!el2) return;
+  const t = ($('#ai-screenplay-text').value || '');
+  if (!t.trim()) { el2.textContent = ''; el2.style.color = ''; return; }
+  // 粗估:以「角色：內容」或方括號記法開頭的行當一則
+  const n = t.split('\n').filter((L) => /^\s*(\[[^\]]+\]|[^\s:：]{1,12}\s*[:：])/.test(L)).length;
+  const over = n > 40;
+  el2.textContent = '劇本約 ' + n + ' 則' + (over ? '(超過 40 則,執行端可能做不完,建議砍掉鋪陳或分幕製作)' : '');
+  el2.style.color = over ? '#b45309' : '';
+}
+$('#ai-screenplay-text').addEventListener('input', () => { screenplaySave(); screenplayCount(); });
 $('#ai-stop').addEventListener('click', () => { imgAbort = true; if (aborter) aborter.abort(); });
 $('#ai-undo').addEventListener('click', () => {
   const mine = undoEntries();

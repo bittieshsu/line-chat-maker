@@ -105,7 +105,7 @@
       <label>API Base <input id="ai-base" type="text" spellcheck="false"></label>
       <label>Model <input id="ai-model" type="text" spellcheck="false"></label>
       <label>API Key <input id="ai-key" type="password" autocomplete="off"></label>
-      <label>迴圈上限(單次「開始製作」的輪數天花板,每按一次重新起算;愈高愈能自行推進,也愈耗額度) <input id="ai-loops" type="number" min="3" max="50"></label>
+      <label>迴圈上限(單次「開始製作」的輪數天花板,每按一次重新起算;約 3 輪填 8 則,預設 30 夠做 80 則。愈高愈能自行推進,也愈耗額度) <input id="ai-loops" type="number" min="3" max="60"></label>
       <h2>編劇/評審模型(選填)</h2>
       <label>Provider <select id="ai-w-provider"></select></label>
       <div id="ai-w-fields" hidden>
@@ -144,6 +144,7 @@
     </div>
     <label>劇本(按「劇本強化」讓 AI 寫或改;你也可以直接編輯、反覆強化,和 AI 一起把劇本寫好)
       <textarea id="ai-screenplay-text" rows="8" placeholder="按「劇本強化」由 AI 起稿,或自己先寫幾行…"></textarea>
+      <p class="hint" id="ai-screenplay-count"></p>
     </label>
     <h2>第 2 段:實作</h2>
     <div class="addbar">
