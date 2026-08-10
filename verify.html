@@ -154,6 +154,38 @@ function detectPattern(d, W, H) { // 積分圖 → 各（相位，平移）候�
   const z = Math.max(...stats);
   return { found: z > 7, z }; // null 是 16384 個 N(0,1) 的極值，期望約 4.3;7 以上才判檢出
 }
+// 縮放會破壞 16px 格線對齊,平移搜尋補不了 —— 但實測顯示訊號本身還在(平滑場是低頻,重新取樣殺不掉它)。
+// 所以把「還原倍率」也納入搜尋:重新取樣回去再驗。粗掃一遍再在最高分附近細掃,不然要跑幾十萬個候選。
+// 實測(1200x630 的圖):縮到 40% 直接驗只有 2.7,尺度搜尋救回 36.5,跟原尺寸的 36.4 幾乎一樣。
+function detectWithScale(canvas) {
+  const ctx0 = canvas.getContext('2d', { willReadFrequently: true });
+  const direct = detectPattern(ctx0.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height);
+  if (direct.found) return { ...direct, scale: 1 };
+
+  const at = (f) => {
+    const w = Math.round(canvas.width * f), h = Math.round(canvas.height * f);
+    if (w < 128 || h < 128 || w > 4200 || h > 4200) return { found: false, z: 0 };
+    const c = document.createElement('canvas'); c.width = w; c.height = h;
+    const x = c.getContext('2d', { willReadFrequently: true });
+    x.imageSmoothingEnabled = true; x.imageSmoothingQuality = 'high';
+    x.drawImage(canvas, 0, 0, w, h);
+    return detectPattern(x.getImageData(0, 0, w, h).data, w, h);
+  };
+  let best = { ...direct, scale: 1 };
+  for (let f = 1.1; f <= 2.6; f += 0.1) { // 粗掃
+    const r = at(f);
+    if (r.z > best.z) best = { ...r, scale: f };
+  }
+  if (best.scale !== 1) { // 在最高分附近細掃
+    for (let f = best.scale - 0.09; f <= best.scale + 0.09; f += 0.02) {
+      if (f <= 1) continue;
+      const r = at(f);
+      if (r.z > best.z) best = { ...r, scale: f };
+    }
+  }
+  return best;
+}
+
 async function check(file) {
   const out = document.getElementById('out');
   out.innerHTML = '<p>分析中…</p>';
@@ -167,13 +199,13 @@ async function check(file) {
   ctx.drawImage(img, 0, 0);
   const d = ctx.getImageData(0, 0, c.width, c.height).data;
   const lsb = findLSB(d);
-  const pat = detectPattern(d, c.width, c.height);
+  const pat = detectWithScale(c);
   const row = (name, hit, detail) => `<tr><td>${name}</td><td><span class="${hit ? 'ok' : 'no'}">${hit ? '檢出' : '未檢出'}</span> ${detail}</td></tr>`;
   const anyHit = !!itxt || !!lsb || pat.found;
   out.innerHTML = `<table>
     ${row('檔案 metadata', !!itxt, itxt ? esc(itxt) : '<span class="hint">上傳社群平台通常會被移除</span>')}
     ${row('像素藏碼', !!lsb, lsb ? esc(lsb) : '<span class="hint">轉檔或重壓縮後會消失</span>')}
-    ${row('隱形場紋', pat.found, `<span class="hint">訊號強度 z=${pat.z.toFixed(1)}（門檻 7）；截圖/重壓縮/裁切後仍可驗，縮放後不保證</span>`)}
+    ${row('隱形場紋', pat.found, `<span class="hint">訊號強度 z=${pat.z.toFixed(1)}（門檻 7）；截圖、重壓縮、裁切、縮放後都可驗${pat.found && pat.scale && pat.scale !== 1 ? `。<b>這張圖被縮放過</b>，還原倍率約 ${pat.scale.toFixed(2)} 倍` : ''}</span>`)}
   </table>
   <p>${anyHit ? '<strong>這張圖帶有 LINE 對話製造機的識別標記，是本工具產生的示意圖，不是真實對話截圖。</strong>' : '未檢出本工具的標記。注意：這不代表圖是真的，只代表不是（或已無法辨識為）本工具匯出的。'}</p>`;
 }
