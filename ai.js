@@ -617,6 +617,17 @@ async function probeFillJob(record) { // 單次查後端 job;succeeded→回 bit
   if (d.status === 'failed' || d.status === 'expired') return { dead: true };
   return {};
 }
+let lastGridUrl = null; // 最近一次補圖的原始格盤圖(只留在記憶體,重整就沒了)
+function keepGrid(bitmap) {
+  try {
+    const c = document.createElement('canvas');
+    c.width = bitmap.width; c.height = bitmap.height;
+    c.getContext('2d').drawImage(bitmap, 0, 0);
+    lastGridUrl = c.toDataURL('image/png');
+    const b = $('#ai-grid-dl'); if (b) b.hidden = false;
+  } catch (e) { lastGridUrl = null; }
+}
+
 async function recoverFill() {
   const record = readPending();
   if (!record) { toast('沒有可取回的補圖'); updateRecoverButton(); return; }
@@ -634,6 +645,7 @@ async function recoverFill() {
         toast('草稿已變動;跳過 ' + v.skipped + ' 格避免貼錯');
         log('有 ' + v.skipped + ' 格的目標訊息／人物已變動,為避免貼錯已略過(可重新補圖)。', 'warn');
       }
+      keepGrid(res.img);
       applyGrid(res.img, record.grid, v.cells);
       aiUndoStack.push({ draftId: currentId, snap: before });
       if (aiUndoStack.length > 20) aiUndoStack.shift();
@@ -675,6 +687,7 @@ async function runFillImages() {
     log(`送出生圖(${grid.cols}×${grid.rows} 格盤)…`);
     const img = await generateBitmap(buildGridPrompt(grid, cells), grid.size, (jobId) => savePending(jobId, grid, fillCells));
     log('生成完成,切圖回填…');
+    keepGrid(img); // 原圖用完就丟太可惜:那張一次生成、人物跨格一致的格盤圖本身就有看頭,留給使用者下載
     applyGrid(img, grid, fillCells);
     aiUndoStack.push({ draftId: currentId, snap: before });
     if (aiUndoStack.length > 20) aiUndoStack.shift();
@@ -694,6 +707,13 @@ async function runFillImages() {
 }
 $('#ai-images').addEventListener('click', () => { if (!navigator.onLine) { toast('離線中,AI 補圖需要網路'); return; } runFillImages(); });
 $('#ai-recover').addEventListener('click', () => { if (!navigator.onLine) { toast('離線中;取回需要網路'); return; } recoverFill(); });
+$('#ai-grid-dl').addEventListener('click', () => {
+  if (!lastGridUrl) { toast('這一輪還沒有格盤圖;補一次圖之後就能下載'); return; }
+  const a = document.createElement('a');
+  a.download = 'line-chat-grid.png';
+  a.href = lastGridUrl;
+  a.click();
+});
 window.lcmRegenImage = async (msgIndex) => { // 單格重生(app.js 的 hover 按鈕呼叫)
   const m = state.messages[msgIndex];
   if (!m || !m.imgPrompt || !navigator.onLine) return;
@@ -759,6 +779,7 @@ function setBusy(on) {
   $('#ai-quick-run').disabled = on;
   $('#ai-images').disabled = on;
   $('#ai-recover').disabled = on;
+  $('#ai-grid-dl').disabled = on;
   $('#ai-stop').hidden = !on;
   if (!on) updateGate();
 }
