@@ -21,7 +21,7 @@
 </head>
 <body>
 <h1>圖片識別標記驗證</h1>
-<p>檢查一張圖或一支影片是否由 <a href="./">LINE 對話製造機</a> 匯出。匯出的 PNG 帶三層標記（檔案 metadata、像素藏碼、隱形場紋）；匯出的 MP4 每一幀都帶隱形場紋，驗證時多幀平均後統計比對。場紋在截圖、轉檔、重壓縮、裁切後仍可驗出（縮放後不保證）。檔案只在你的瀏覽器本機分析，不會上傳。</p>
+<p>檢查一張圖或一支影片是否由 <a href="./">LINE 對話製造機</a> 匯出。匯出的 PNG 帶三層標記（檔案 metadata、像素藏碼、隱形場紋）；匯出的 MP4 每一幀都帶隱形場紋，驗證時多幀平均後統計比對。場紋在截圖、轉檔、重壓縮、裁切、縮放後都驗得出來（縮放靠還原倍率搜尋，只要留下的區域還有約 200×200 像素）。影片目前只做到重壓縮與轉檔，縮放不保證。檔案只在你的瀏覽器本機分析，不會上傳。</p>
 <div id="drop">把圖片或影片拖到這裡，或點擊選檔</div>
 <input id="file" type="file" accept="image/*,video/*" hidden>
 <div id="out"></div>
@@ -32,7 +32,7 @@
 <ol>
 <li><strong>檔案 metadata</strong>:PNG iTXt 區塊帶識別字串與網址。轉傳原檔可驗；上傳社群平台通常會被剝除。</li>
 <li><strong>像素藏碼</strong>：識別字串逐位元藏在 alpha 通道最低位元。原檔未轉檔、未重壓縮可驗。</li>
-<li><strong>隱形場紋</strong>：藍色通道 ±2/255 的平滑偽隨機場，肉眼不可見；驗證時對 16 像素區塊做統計匹配（相位與平移搜尋、匹配濾波、平坦區加權），截圖、JPEG 重壓縮、裁切後仍驗得出，縮放後不保證。</li>
+<li><strong>隱形場紋</strong>：藍色通道 ±2/255 的平滑偽隨機場，肉眼不可見；驗證時對 16 像素區塊做統計匹配（相位與平移搜尋、匹配濾波、平坦區加權），截圖、JPEG 重壓縮、裁切後仍驗得出；縮放過的圖會自動搜尋還原倍率再比對，實測縮到 20% 仍可驗，極限取決於剩下幾格而不是破壞程度。</li>
 </ol>
 <p>演算法、判定門檻與實測數據全部公開在 <a href="https://github.com/yazelin/line-chat-maker/blob/master/docs/watermark.md" target="_blank" rel="noopener">docs/watermark.md</a>。公開不會讓標記變弱：本工具開源，原理本來就藏不住。這套驗證能被信任，靠的是任何人都能審計與複驗，不是靠保密。</p>
 <p><strong>給想拿這個工具做詐騙圖的人</strong>：對，照著原理你可以把圖上的標記洗掉，我們擋不住。但你洗得掉圖上的標記，洗不掉身上的：用假對話截圖行騙，是詐欺（<a href="https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=C0000001&amp;flno=339" target="_blank" rel="noopener">刑法第 339 條</a>）與偽造文書（<a href="https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=C0000001&amp;flno=210" target="_blank" rel="noopener">第 210 條</a>、<a href="https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=C0000001&amp;flno=216" target="_blank" rel="noopener">第 216 條</a>、<a href="https://law.moj.gov.tw/LawClass/LawSingle.aspx?pcode=C0000001&amp;flno=220" target="_blank" rel="noopener">第 220 條</a>）的刑事犯罪，留下的是前科。而且標記與偵測會隨版本演進，你「已經洗乾淨」的把握，只停留在你讀文件的那一天。</p>
@@ -249,7 +249,7 @@ async function checkVideo(file) { // 影片:場紋逐幀相同,H.264 雜訊逐�
   const pat = detectPattern(avg, W, H);
   const row = (name, hit, detail) => `<tr><td>${name}</td><td><span class="${hit ? 'ok' : 'no'}">${hit ? '檢出' : '未檢出'}</span> ${detail}</td></tr>`;
   out.innerHTML = `<table>
-    ${row('隱形場紋（影片）', pat.found, `<span class="hint">平均 ${n} 幀後 z=${pat.z.toFixed(1)}（門檻 7）;重壓縮、平台轉檔後仍可驗,縮放後不保證</span>`)}
+    ${row('隱形場紋（影片）', pat.found, `<span class="hint">平均 ${n} 幀後 z=${pat.z.toFixed(1)}（門檻 7）;重壓縮、平台轉檔後仍可驗;影片尚未做尺度搜尋(逐幀成本高),平台改解析度不保證</span>`)}
   </table>
   <p class="hint">影片沒有 PNG 的檔案 metadata 與像素藏碼兩層(編碼會抹掉),只靠隱形場紋。</p>
   <p>${pat.found ? '<strong>這支影片帶有 LINE 對話製造機的識別標記，是本工具產生的示意內容，不是真實對話畫面。</strong>' : '未檢出本工具的標記。注意：這不代表影片是真的，只代表不是（或已無法辨識為）本工具匯出的。'}</p>`;

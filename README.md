@@ -52,9 +52,9 @@
 
 | 用途 | 來源選項（連線設定） | 預設 model | 免費額度 |
 |---|---|---|---|
-| 文字（編劇/評審/執行/微調） | 「刷亞澤的信用卡」（站長代理）/ Groq / OpenAI / Gemini / OpenRouter / Ollama / 自訂 | 站長代理與 Groq＝`openai/gpt-oss-120b`；OpenAI＝`gpt-5-mini`；Gemini＝`gemini-3.1-flash-lite`（編劇選 Gemini 自動帶 `gemini-3.1-pro-preview`） | 站長代理：每 IP 每日 60 次呼叫（約 3 個作品），全站每日 1200 次熔斷；自帶 key 不限 |
+| 文字（編劇/評審/執行/微調） | 「刷亞澤的信用卡」（站長代理）/ Groq / OpenAI / Gemini / OpenRouter / Ollama / 自訂 | 站長代理與 Groq＝`openai/gpt-oss-120b`；OpenAI＝`gpt-5-mini`；Gemini＝`gemini-3.1-flash-lite`（編劇選 Gemini 自動帶 `gemini-3.1-pro-preview`） | 站長代理：每 IP 每日 60 次呼叫（約 3 個作品），另有全站每日熔斷（實際值見 `worker/wrangler.toml`，會隨活動調整）；自帶 key 不限 |
 | 編劇/評審可另設 | 同上任一（與執行分開設定） | 同上 | 同上 |
-| 圖像（AI 補圖/重生） | 站長贊助 / 自帶 Gemini key / 自架 [codex-image-service](https://github.com/yazelin/codex-image-service)（服務端要開 CORS）/ OpenAI 繪圖 API | Gemini＝`gemini-3.1-flash-image`；OpenAI＝`gpt-image-2`（gpt-image-1 於 2026-10 退場） | 站長贊助：每 IP 每日 2 次、全站每日 20 次；自帶 key 不限 |
+| 圖像（AI 補圖/重生） | 站長贊助 / 自帶 Gemini key / 自架 [codex-image-service](https://github.com/yazelin/codex-image-service)（服務端要開 CORS）/ OpenAI 繪圖 API | Gemini＝`gemini-3.1-flash-image`；OpenAI＝`gpt-image-2`（gpt-image-1 於 2026-10 退場） | 站長贊助：每 IP 每日 2 次，另有全站上限（見 `worker/wrangler.toml`）；自帶 key 不限 |
 
 右上角徽章顯示「今日剩：AI N/60・圖 N/2」；額度 UTC 換日（台北早上 8 點重置）。站長側全部參數在 `worker/wrangler.toml`。
 
@@ -76,8 +76,8 @@ node test/wall-ui.e2e.mjs      # 共享區前端（自己起靜態站與 wrangle
 ## 聲明與防濫用
 
 - 介面**只提供玩樂風格**，產出一眼看得出是製圖（部落格配圖、教學、行銷素材），不做擬真截圖。請勿用於詐騙、毀謗、偽造證據等誤導用途。
-- 匯出的 PNG 除了可開關、文字可自訂的浮水印，**一律嵌入三層隱形識別標記**（無開關）:PNG iTXt metadata、alpha 通道藏碼、±2/255 平滑藍場紋（肉眼不可見；截圖、JPEG 重壓縮、裁切後仍可統計驗出，縮放後不保證）。
-- 匯出的 MP4 **每一幀都帶同一張隱形場紋**；驗證時多幀平均後偵測，H.264 重壓縮、平台轉檔後仍驗得出（縮放後不保證）。原理與實測數據見 [docs/watermark.md](docs/watermark.md)。
+- 匯出的 PNG 除了可開關、文字可自訂的浮水印，**一律嵌入三層隱形識別標記**（無開關）:PNG iTXt metadata、alpha 通道藏碼、±2/255 平滑藍場紋（肉眼不可見；截圖、JPEG 重壓縮、裁切、縮放後都可統計驗出，留下約 200×200 像素以上就驗得到）。
+- 匯出的 MP4 **每一幀都帶同一張隱形場紋**；驗證時多幀平均後偵測，H.264 重壓縮、平台轉檔後仍驗得出（影片尚未做尺度搜尋，平台改解析度不保證）。原理與實測數據見 [docs/watermark.md](docs/watermark.md)。
 - 任何人都可以用 [verify.html](https://yazelin.github.io/line-chat-maker/verify.html) 拖**圖或影片**驗證「是否由本工具產生」，分析全在瀏覽器本機。
 - 誠實說明界限：本專案開源，標記擋不住有心人 fork 移除，別的工具做的假圖也驗不出來。標記的目的是提高順手濫用的成本、給受害者與平台一個識別線索，不是防偽保證。
 - 非官方工具；LINE 為 LY Corporation 之商標，本專案與其無任何關聯。
