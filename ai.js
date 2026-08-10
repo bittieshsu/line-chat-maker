@@ -866,9 +866,11 @@ updateRecoverButton();
 refreshQuota();
 { const c = cfg(); $('#ai-settings').open = needsKey(c) || !c.model; } // 只在載入時決定一次:沒設好=展開;之後不自動開合,不打擾使用者輸入
 
-// ── WebMCP:同一組工具註冊給頁面的 modelContext,讓 ZeroType Agent 等外部 agent 直接聰明操作 ──
+// ── WebMCP:同一組工具註冊給頁面的 modelContext,外部 agent 不必戳 DOM 就能操作本頁 ──
+// 規格已把 API 從 navigator 搬到 document:Chrome 150 兩個都有(共用同一份工具表),149 只有 navigator。
+// 優先 document,navigator 版被拔掉時才不會整條啞掉。
 try {
-  const mc = navigator.modelContext;
+  const mc = document.modelContext || navigator.modelContext;
   if (mc) {
     const tools = TOOL_DEFS.map((t) => ({
       name: t.name,
@@ -877,8 +879,8 @@ try {
       annotations: t.name === 'get_script' ? { readOnlyHint: true } : {},
       execute: async (args) => ({ content: [{ type: 'text', text: await execTool(t.name, typeof args === 'string' ? JSON.parse(args || '{}') : (args || {})) }] }),
     }));
-    if (typeof mc.provideContext === 'function') mc.provideContext({ tools });
-    else if (typeof mc.registerTool === 'function') for (const t of tools) mc.registerTool(t);
+    if (typeof mc.registerTool === 'function') for (const t of tools) mc.registerTool(t); // Chrome 149/150 實測走這條
+    else if (typeof mc.provideContext === 'function') mc.provideContext({ tools }); // 規格變體備援
   }
 } catch (e) { console.warn('WebMCP 註冊失敗(不影響內建 AI)', e); }
 

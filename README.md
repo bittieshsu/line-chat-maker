@@ -45,7 +45,7 @@
    - **AI 補圖**：美術指導 AI 依腳本產出每格繪圖 prompt（人物跨格一致、貼圖綠底），格盤**單次生圖呼叫**＋程式自動排格切回＋綠幕去背；單張可重生、prompt 可手改。
    - **AI 微調**：預覽下方一句話直改畫面（只動指定處）；所有 AI 修改都推進多步還原堆疊。
    - 圖片以 `@imgN` 佔位符進出模型不會弄丟；設定與 Key 只存 localStorage。
-2. **WebMCP**：同一組工具會註冊到 `navigator.modelContext`（瀏覽器支援才生效），ZeroType Agent 等 WebMCP-aware 的 agent 擴充套件可直接以結構化工具操作本頁，不必戳 DOM。
+2. **WebMCP**：同一組工具會註冊到 `navigator.modelContext`（Chrome 150 起 `document.modelContext` 也拿得到同一組），外部 agent 不必戳 DOM，可以直接 `getTools()` 讀到工具名與 JSON schema、`executeTool()` 呼叫。目前是 origin trial 階段，瀏覽器要開 `chrome://flags/#enable-webmcp-testing` 才有這個 API；沒開就完全不影響站內其他功能。實測與驗收見 [test/webmcp.e2e.mjs](test/webmcp.e2e.mjs)。
 3. **外部 Agent skill**：repo 內附 [skills/line-chat-maker/SKILL.md](skills/line-chat-maker/SKILL.md)：腳本 JSON schema 與交付方式（檔案匯入/`#s=` 一鍵連結/Playwright 自動匯出）。把 skill 目錄 symlink 進你的 agent skills 資料夾即可。
 
 ### AI 來源與額度
@@ -61,6 +61,14 @@
 ## 本機開發
 
 沒有 build step。`git clone` 後直接開 `index.html`，或任何靜態伺服器。
+
+測試都是純 node，不裝任何套件：
+
+```bash
+node test/pure.test.mjs        # 去背/幾何/檔名等純邏輯
+node test/skin-gate.test.mjs   # skin 選擇
+node test/webmcp.e2e.mjs       # WebMCP 端到端（要本機有 google-chrome；CHROME=/snap/bin/chromium 可換瀏覽器）
+```
 
 ## 聲明與防濫用
 
