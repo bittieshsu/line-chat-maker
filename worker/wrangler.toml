@@ -12,16 +12,16 @@ MODEL = "openai/gpt-oss-120b"
 WRITER_MODEL = "glm-5.2"
 LLMSHARE_BASE = "https://llm-share.duotify.com/v1"
 # 編劇(GLM)獨立且更緊的每日額度,保護朋友的 key(Origin 可偽造,不能只靠共用的 GLOBAL_DAILY)。依朋友 key 容量調整。
-GLM_IP_DAILY = "20"
-GLM_GLOBAL_DAILY = "200"
-# 每 IP 每日 AI 呼叫上限(約 20 次=1 個完整作品)
-IP_DAILY = "60"
+GLM_IP_DAILY = "200"
+GLM_GLOBAL_DAILY = "2000"
+# 每 IP 每日 AI 呼叫上限(約 20 次=1 個完整作品)。0812 實作營期間暫調高,8/13 要調回 60
+IP_DAILY = "120"
 # 全站每日熔斷:成本天花板 = GLOBAL_DAILY x 單次呼叫成本(粗估每日上限 1200 次 ≈ US$1.2)
-GLOBAL_DAILY = "1200"
+GLOBAL_DAILY = "2500"
 # AI 補圖(codex-image-service,走站長 ChatGPT 額度):額度獨立於文字
 CODEX_IMAGE_BASE = "https://ching-tech.ddns.net/codex-image"
-IMG_IP_DAILY = "2"
-IMG_GLOBAL_DAILY = "20"
+IMG_IP_DAILY = "6"   # 0812 活動期間暫調(平常 2),8/13 調回
+IMG_GLOBAL_DAILY = "200" # 0812 活動期間暫調(平常 20),8/13 調回
 
 # 共享區梯次代號(投稿與清單都用它);換梯次改這裡
 WALL_EVENT = "chat-2026-08-12"

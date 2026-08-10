@@ -15,9 +15,11 @@ let chromium;
 try { ({ chromium } = await import(PLAYWRIGHT)); }
 catch (e) { console.log('跳過:找不到 playwright(' + PLAYWRIGHT + ')。裝了再跑,或用 PLAYWRIGHT_PATH 指路。'); process.exit(0); }
 
-// 本機牆先清空,不然上一輪的投稿會讓「沒有作品時的提示」與「刪除鈕只屬於自己」兩條誤判
-spawnSync('npx', ['wrangler', 'd1', 'execute', 'k-rider-signups', '--local', '--command', 'DELETE FROM chat_wall_submissions'],
+// 自己把表建起來再清空,不要假設本機 D1 已經有表(本機狀態不進版控,換台機器或清掉就沒了)
+const d1 = (args) => spawnSync('npx', ['wrangler', 'd1', 'execute', 'k-rider-signups', '--local', ...args],
   { cwd: join(ROOT, 'worker'), stdio: 'ignore' });
+d1(['--file', 'wall-schema.sql']);
+d1(['--command', 'DELETE FROM chat_wall_submissions']);
 
 const kids = [];
 const spawnBg = (cmd, args, cwd) => { const c = spawn(cmd, args, { cwd, stdio: 'ignore', detached: true }); kids.push(c); return c; };
@@ -29,7 +31,7 @@ spawnBg('python3', ['-m', 'http.server', '8917', '--bind', '127.0.0.1'], ROOT);
 spawnBg('npx', ['wrangler', 'dev', '--port', '8799', '--local'], join(ROOT, 'worker'));
 
 let up = false;
-for (let i = 0; i < 120 && !up; i++) {
+for (let i = 0; i < 240 && !up; i++) { // wrangler dev 冷啟動可能要幾十秒
   await new Promise((r) => setTimeout(r, 500));
   try {
     const a = await fetch('http://127.0.0.1:8917/');
@@ -157,6 +159,19 @@ await check('展示模式只剩作品,而且顯示標題與作者', async () => 
   if (!capBox || capBox.y + capBox.height > 460) throw new Error('字幕被擠出畫面了');
   await dp.screenshot({ path: join(ROOT, 'wall-display.png') });
   await dp.close();
+});
+
+await check('帶碼網址會自動填好活動碼,而且碼不留在網址列', async () => {
+  const cp = await ctx.newPage();
+  await cp.addInitScript(() => { try { localStorage.setItem('lcm-wall-api', 'http://127.0.0.1:8799'); } catch (e) {} });
+  await cp.goto(SITE + '?code=local-code', { waitUntil: 'load' });
+  await cp.waitForTimeout(3000);
+  const v = await cp.locator('#wall-code').inputValue();
+  if (v !== 'local-code') throw new Error('活動碼沒帶入,實得:' + v);
+  const active = await cp.locator('.tabs .tab.active').innerText();
+  if (!active.includes('共享區')) throw new Error('沒切到共享區分頁,現在在:' + active);
+  if (cp.url().includes('code=')) throw new Error('碼還留在網址列:' + cp.url());
+  await cp.close();
 });
 
 await check('刪掉自己的作品,牆上就沒了(順便讓這支測試可以重複跑)', async () => {

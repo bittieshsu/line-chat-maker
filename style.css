@@ -114,7 +114,9 @@ body.dark .footer .footer-icon:hover { color: var(--accent); }
 .line-chat .file .fsize { font-size: 0.7rem; color: #8a8a8a; }
 
 /* 左側分頁 */
-.tabs { display: flex; gap: 0.3rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--border); }
+/* 六個分頁在窄視窗會擠成兩行,改成可橫向捲;-webkit-overflow-scrolling 讓觸控裝置順一點 */
+.tabs { display: flex; gap: 0.3rem; margin-bottom: 0.8rem; border-bottom: 1px solid var(--border); overflow-x: auto; scrollbar-width: thin; }
+.tabs .tab { flex: 0 0 auto; }
 .tabs .tab { border: 0; background: none; padding: 0.4rem 0.8rem; font-size: 0.9rem; cursor: pointer; color: var(--muted); border-bottom: 2px solid transparent; }
 .tabs .tab.active { color: var(--accent); border-bottom-color: var(--accent); font-weight: 700; }
 .pane { display: none; }

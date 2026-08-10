@@ -1,7 +1,7 @@
 /* 共享區端點驗收。自己起 wrangler dev(本機 D1),跑完關掉,不碰線上資料。
    跑法:node test/wall.e2e.mjs
    前提:worker/.dev.vars 有 WALL_UPLOAD_CODE 與 WALL_ADMIN_TOKEN(不進版控) */
-import { spawn } from 'node:child_process';
+import { spawn, spawnSync } from 'node:child_process';
 import assert from 'node:assert';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
@@ -25,17 +25,21 @@ const post = (p, b, t) => req(p, 'POST', b, t);
 const del = (p, t) => req(p, 'DELETE', null, t);
 const get = (p) => req(p, 'GET', null, null);
 
+// 自己把表建起來,不要假設本機 D1 已經有表(本機狀態不進版控)
+spawnSync('npx', ['wrangler', 'd1', 'execute', 'k-rider-signups', '--local', '--file', 'wall-schema.sql'],
+  { cwd: WORKER_DIR, stdio: 'ignore' });
+
 // detached + 殺整個行程群組:wrangler 底下還有 workerd 孫行程,只 kill npx 會留下佔著埠不放的殭屍
 const proc = spawn('npx', ['wrangler', 'dev', '--port', String(PORT), '--local'], { cwd: WORKER_DIR, stdio: 'ignore', detached: true });
 const stop = () => { try { process.kill(-proc.pid); } catch (e) { try { proc.kill(); } catch (e2) {} } };
 process.on('exit', stop);
 
 let up = false;
-for (let i = 0; i < 120 && !up; i++) {
+for (let i = 0; i < 240 && !up; i++) { // wrangler dev 冷啟動可能要幾十秒
   await new Promise((r) => setTimeout(r, 500));
   try { up = (await get(`/api/wall/events/${EVENT}/submissions`)).ok; } catch (e) {}
 }
-if (!up) { stop(); console.error('wrangler dev 起不來,或本機 D1 沒有 chat_wall_submissions 表'); process.exit(1); }
+if (!up) { stop(); console.error('wrangler dev 起不來'); process.exit(1); }
 
 const t = [];
 const check = async (name, fn) => { try { await fn(); t.push(['ok', name]); } catch (e) { t.push(['FAIL', name + ' → ' + e.message]); } };

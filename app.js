@@ -155,7 +155,10 @@ async function boot() {
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
   importFromQuery();
-  if (new URLSearchParams(location.search).get('wall') === 'display') wallDisplayMode();
+  const q = new URLSearchParams(location.search);
+  if (q.get('wall') === 'display') wallDisplayMode();
+  // ?code=xxx 自動帶入活動碼:現場少一個打錯字的環節。伺服器端照樣驗,前端只是省打字。
+  if (q.get('code') && q.get('wall') !== 'display') wallPrefillCode(q.get('code'));
 }
 
 const $ = (sel) => document.querySelector(sel);
@@ -1189,6 +1192,18 @@ async function wallDisplayMode() {
 
   await poll();
   setInterval(poll, 2000);
+}
+
+function wallPrefillCode(code) { // 帶碼網址進來:填好活動碼、切到共享區、把投稿區展開
+  const el2 = $('#wall-code');
+  if (!el2) return;
+  el2.value = String(code).trim().slice(0, 64);
+  $('#wall-post').open = true;
+  document.querySelector('.tabs [data-pane="wall"]').click();
+  // 只拿掉 code,其他參數留著(?id= 之類還有人要用);碼不留在網址列,免得被順手截圖出去
+  const u = new URL(location.href); u.searchParams.delete('code');
+  history.replaceState(null, '', u.pathname + (u.search || '') + u.hash);
+  toast('活動碼已帶入,填個名字就能投稿');
 }
 
 document.querySelector('.tabs [data-pane="wall"]').addEventListener('click', renderWall);
