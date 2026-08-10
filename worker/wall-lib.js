@@ -5,9 +5,11 @@ export function normalizeEvent(v) {
   return /^[a-z0-9][a-z0-9-]{2,63}$/.test(s) ? s : null;
 }
 
-export function normalizeCode(v) { // 短碼=內容雜湊前 8 碼;碰撞時 shorturl 會改發 12 或 16 碼
-  const s = String(v || '').trim().toLowerCase();
-  return /^[a-f0-9]{8,16}$/.test(s) ? s : null;
+// 短碼=SHA-256 的 base64url 前 8 碼(碰撞時改發 12 或 16 碼)。
+// 是 base64url 不是十六進位,而且**大小寫有意義**,絕對不能 toLowerCase。
+export function normalizeCode(v) {
+  const s = String(v || '').trim();
+  return /^[A-Za-z0-9_-]{8,16}$/.test(s) ? s : null;
 }
 
 function clean(v, max) { // 去控制字元、壓多重空白、截長度

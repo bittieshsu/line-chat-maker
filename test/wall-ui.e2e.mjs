@@ -57,7 +57,7 @@ const stash = new Map();
 const stub = async (page) => {
   await page.route('**/api/short-url', async (route) => {
     const body = JSON.parse(route.request().postData() || '{}');
-    const code = 'a1b2c3d4';
+    const code = 'Xk9-_aB2'; // 真實格式:base64url
     stash.set(code, body.state);
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ code, shortUrl: 'http://x/s/' + code }) });
   });
@@ -157,7 +157,8 @@ await check('展示模式只剩作品,而且顯示標題與作者', async () => 
   const capBox = await dp.locator('.wall-cap').boundingBox();
   if (!box || box.height > 460) throw new Error('作品沒有被縮進畫面,高度 ' + (box && box.height));
   if (!capBox || capBox.y + capBox.height > 460) throw new Error('字幕被擠出畫面了');
-  await dp.screenshot({ path: join(ROOT, 'wall-display.png') // 已 gitignore;要看就開這個檔 });
+  // 截圖存在 repo 根目錄,已 gitignore;要看就開那個檔
+  await dp.screenshot({ path: join(ROOT, 'wall-display.png') });
   await dp.close();
 });
 

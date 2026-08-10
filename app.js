@@ -1178,7 +1178,8 @@ async function wallShortCode() { // 產生(或沿用)這份作品的短碼;同�
   const code = String(d.code || '').trim();
   // 把伺服器講的原因帶出來,不要吞掉換成一句沒用的「等一下再試」
   if (!r.ok) throw new Error('分享服務回了錯誤:' + (d.error || ('HTTP ' + r.status)));
-  if (!/^[a-f0-9]{8,16}$/.test(code)) throw new Error('分享服務沒給短碼(回傳:' + JSON.stringify(d).slice(0, 120) + ')');
+  // 短碼是 base64url(大小寫有意義),不是十六進位
+  if (!/^[A-Za-z0-9_-]{8,16}$/.test(code)) throw new Error('分享服務沒給短碼(回傳:' + JSON.stringify(d).slice(0, 120) + ')');
   if (shrunk) toast('圖片已為分享縮小,你手上的原圖不受影響');
   return code;
 }

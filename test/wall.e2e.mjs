@@ -44,7 +44,7 @@ if (!up) { stop(); console.error('wrangler dev 起不來'); process.exit(1); }
 const t = [];
 const check = async (name, fn) => { try { await fn(); t.push(['ok', name]); } catch (e) { t.push(['FAIL', name + ' → ' + e.message]); } };
 
-const CODE = 'a1b2c3d4';
+const CODE = 'Xk9-_aB2'; // 真實的短碼是 base64url,含大小寫與 - _
 let ownerToken = '', id = '';
 
 await check('帶正確活動碼可以投稿', async () => {
@@ -70,17 +70,17 @@ await check('清單不會夾帶作品內容(只回輕量欄位)', async () => {
 });
 
 await check('負控制:沒帶活動碼投不進去', async () => {
-  const r = await post('/api/wall/submissions', { event: EVENT, code: 'b2c3d4e5', name: '路人', consent: true });
+  const r = await post('/api/wall/submissions', { event: EVENT, code: 'Bb2c3d4E', name: '路人', consent: true });
   assert.strictEqual(r.status, 403, '沒帶碼竟然不是 403,實得 ' + r.status);
 });
 
 await check('負控制:活動碼錯投不進去', async () => {
-  const r = await post('/api/wall/submissions', { event: EVENT, code: 'b2c3d4e5', name: '路人', consent: true, uploadCode: 'wrong-code' });
+  const r = await post('/api/wall/submissions', { event: EVENT, code: 'Bb2c3d4E', name: '路人', consent: true, uploadCode: 'wrong-code' });
   assert.strictEqual(r.status, 403);
 });
 
 await check('負控制:沒勾同意投不進去', async () => {
-  const r = await post('/api/wall/submissions', { event: EVENT, code: 'c3d4e5f6', name: '路人', consent: false, uploadCode: 'local-code' });
+  const r = await post('/api/wall/submissions', { event: EVENT, code: 'Cc3d4e5F', name: '路人', consent: false, uploadCode: 'local-code' });
   assert.strictEqual(r.status, 400);
 });
 
@@ -101,7 +101,7 @@ await check('作者帶自己的 token 刪得掉', async () => {
 });
 
 await check('管理權杖刪得掉任何一筆', async () => {
-  const d = await (await post('/api/wall/submissions', { event: EVENT, code: 'd4e5f6a7', name: '別人', consent: true, uploadCode: 'local-code' })).json();
+  const d = await (await post('/api/wall/submissions', { event: EVENT, code: 'Dd4e5f6A', name: '別人', consent: true, uploadCode: 'local-code' })).json();
   assert.strictEqual((await del('/api/wall/submissions/' + d.submission.id, 'local-admin')).status, 200);
 });
 
