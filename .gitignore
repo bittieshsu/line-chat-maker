@@ -1,3 +1,6 @@
 
 # 本機 wrangler dev 用的假 secret,不進版控
 worker/.dev.vars
+
+# wrangler dev 的本機狀態(miniflare D1 等),不進版控
+worker/.wrangler/
