@@ -1129,15 +1129,57 @@ async function renderWall() {
   });
 }
 
+const SHARE_MAX = 2000000; // 短碼服務的上限:超過就回 400 State too large
+
+// 補過圖的作品很容易超過 2MB(每張圖都是 dataURL)。與其讓人投稿失敗,先把訊息裡的圖
+// 重新編碼縮小,只動要送出去的那份副本,不碰使用者手上的草稿。
+async function shrinkForShare(src) {
+  const s2 = JSON.parse(JSON.stringify(src));
+  const imgs = (s2.messages || []).filter((m) => m && typeof m.img === 'string' && m.img.startsWith('data:'));
+  const shrink = (dataUrl, max, q) => new Promise((res) => {
+    const im = new Image();
+    im.onload = () => {
+      const k = Math.min(1, max / Math.max(im.width, im.height));
+      const c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(im.width * k));
+      c.height = Math.max(1, Math.round(im.height * k));
+      const cx = c.getContext('2d');
+      cx.drawImage(im, 0, 0, c.width, c.height);
+      // 貼圖要保留透明,只能走 WebP;照片走 JPEG 白底比較小
+      res(c.toDataURL(dataUrl.startsWith('data:image/png') ? 'image/webp' : 'image/jpeg', q));
+    };
+    im.onerror = () => res(dataUrl);
+    im.src = dataUrl;
+  });
+  for (const [max, q] of [[512, 0.8], [384, 0.7], [256, 0.6]]) {
+    if (JSON.stringify(s2).length <= SHARE_MAX) break;
+    for (const m of imgs) m.img = await shrink(m.img, max, q);
+  }
+  return s2;
+}
+
 async function wallShortCode() { // 產生(或沿用)這份作品的短碼;同內容同碼,寫入會去重
+  let payload = state;
+  let shrunk = false;
+  if (JSON.stringify(payload).length > SHARE_MAX) {
+    payload = await shrinkForShare(state);
+    shrunk = true;
+    if (JSON.stringify(payload).length > SHARE_MAX) {
+      throw new Error('作品太大,連縮圖都塞不進分享服務(上限 2MB)。刪掉幾張圖再投稿。');
+    }
+  }
   // app 欄位不能省:shorturl 靠它決定雜湊哪一段內容,漏了會被當成別的產品的請求擋掉
   const r = await fetch(SHORTURL_API + '/api/short-url', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ app: 'line-chat-maker', state }),
+    body: JSON.stringify({ app: 'line-chat-maker', state: payload }),
   });
-  const d = await r.json();
+  let d = {};
+  try { d = await r.json(); } catch (e) {}
   const code = String(d.code || '').trim();
-  if (!/^[a-f0-9]{8,16}$/.test(code)) throw new Error('短碼產不出來,等一下再試');
+  // 把伺服器講的原因帶出來,不要吞掉換成一句沒用的「等一下再試」
+  if (!r.ok) throw new Error('分享服務回了錯誤:' + (d.error || ('HTTP ' + r.status)));
+  if (!/^[a-f0-9]{8,16}$/.test(code)) throw new Error('分享服務沒給短碼(回傳:' + JSON.stringify(d).slice(0, 120) + ')');
+  if (shrunk) toast('圖片已為分享縮小,你手上的原圖不受影響');
   return code;
 }
 
