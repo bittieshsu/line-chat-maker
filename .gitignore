@@ -4,3 +4,6 @@ worker/.dev.vars
 
 # wrangler dev 的本機狀態(miniflare D1 等),不進版控
 worker/.wrangler/
+
+# UI 測試產生的截圖,不進版控
+wall-display.png

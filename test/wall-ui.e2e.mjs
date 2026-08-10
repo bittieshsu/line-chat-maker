@@ -157,7 +157,7 @@ await check('展示模式只剩作品,而且顯示標題與作者', async () => 
   const capBox = await dp.locator('.wall-cap').boundingBox();
   if (!box || box.height > 460) throw new Error('作品沒有被縮進畫面,高度 ' + (box && box.height));
   if (!capBox || capBox.y + capBox.height > 460) throw new Error('字幕被擠出畫面了');
-  await dp.screenshot({ path: join(ROOT, 'wall-display.png') });
+  await dp.screenshot({ path: join(ROOT, 'wall-display.png') // 已 gitignore;要看就開這個檔 });
   await dp.close();
 });
 
