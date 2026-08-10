@@ -68,6 +68,7 @@ function migrate(s) {
   if (s.settings.frameLevel === undefined) s.settings.frameLevel = s.settings.frame === false ? 'chat' : 'phone';
   const d = DEMO.settings;
   for (const k of Object.keys(d)) if (s.settings[k] === undefined) s.settings[k] = d[k];
+  window.LCM_PURE.normalizeSides(s); // 缺 side/personId 的 left 訊息(頭像會空一格)
   return s;
 }
 function newId() { return 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -78,7 +79,8 @@ async function createDraft(s, name) {
 }
 function activate(d) {
   flushSave();
-  currentId = d.id; currentName = d.name; state = d.state;
+  // 每次啟用都跑一次 migrate:IndexedDB 裡的舊草稿不經匯入路徑,壞在檔案裡的訊息只有這裡救得到
+  currentId = d.id; currentName = d.name; state = migrate(d.state);
   try { localStorage.setItem('lcm-current', currentId); } catch (e) {}
 }
 async function adoptIncoming(s) {

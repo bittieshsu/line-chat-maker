@@ -102,3 +102,38 @@ test('downloadName:jpeg 頭像存 .jpg、png 保持、無法辨識退 png', () =
   assert.equal(P.downloadName('data:image/webp;base64,AA', 'a.png'), 'a.webp');
   assert.equal(P.downloadName('nope', 'image-2.jpg'), 'image-2.png');
 });
+
+// ── normalizeSides:AI 漏寫 side/personId 的訊息(畫面上是一格沒有頭像的空白)──
+const PEOPLE = [{ id: 'p1', name: '媽' }, { id: 'p2', name: '妹' }];
+test('normalizeSides:缺 side 與 personId 的圖片訊息,補成 left + 前一位左邊發話者', () => {
+  const s = { people: PEOPLE, messages: [
+    { type: 'msg', side: 'left', personId: 'p1', text: '你先不要動' },
+    { type: 'msg', side: 'right', text: '幹' },
+    { type: 'msg', kind: 'image', imgDesc: '洗手檯上的東西' },   // ← 缺 side/personId
+  ] };
+  assert.equal(P.normalizeSides(s), 2);
+  assert.deepEqual({ side: s.messages[2].side, personId: s.messages[2].personId }, { side: 'left', personId: 'p1' });
+});
+test('normalizeSides:不動已經正確的訊息(right 不會被改成 left)', () => {
+  const s = { people: PEOPLE, messages: [
+    { type: 'msg', side: 'right', text: '我' },
+    { type: 'msg', side: 'left', personId: 'p2', text: '她' },
+    { type: 'date', text: '10月14日 (三)' },
+  ] };
+  assert.equal(P.normalizeSides(s), 0);
+  assert.equal(s.messages[0].side, 'right');
+  assert.equal(s.messages[2].personId, undefined);
+});
+test('normalizeSides:指向已刪人物的 personId 也接回前一位發話者', () => {
+  const s = { people: PEOPLE, messages: [
+    { type: 'msg', side: 'left', personId: 'p2', text: '在' },
+    { type: 'msg', side: 'left', personId: 'p9', text: '幽靈' },
+  ] };
+  assert.equal(P.normalizeSides(s), 1);
+  assert.equal(s.messages[1].personId, 'p2');
+});
+test('normalizeSides:沒有人物時原樣不動(交給呼叫端先補人)', () => {
+  const s = { people: [], messages: [{ type: 'msg', kind: 'sticker' }] };
+  assert.equal(P.normalizeSides(s), 0);
+  assert.equal(s.messages[0].side, undefined);
+});

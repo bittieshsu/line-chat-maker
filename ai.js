@@ -74,8 +74,7 @@ function sanitizeMessages(list) {
 }
 function fixRefs() { // left 訊息的 personId 必須存在;沒人就補一位
   if (!state.people.length) state.people.push({ id: 'p1', name: '朋友', avatar: null });
-  const ids = new Set(state.people.map((p) => p.id));
-  for (const m of state.messages) if (m.type === 'msg' && m.side === 'left' && !ids.has(m.personId)) m.personId = state.people[0].id;
+  window.LCM_PURE.normalizeSides(state); // 「不是 right 就是 left」;缺的 personId 跟前一位左邊發話者
 }
 async function execTool(name, args) {
   if (name === 'get_script') return JSON.stringify(strip(scriptOf()));
@@ -117,7 +116,7 @@ schema 重點:
   kind:"image"|"sticker"(配 img 欄位)、"voice"(dur:"0:12")、"file"(fname,fsize);kind 省略=文字
 - react 是「別人對這則訊息的反應」,放在**被反應的那一則訊息**的 react 欄位(劇本寫「小雯對阿亮上一則按 ❤️」=把 ❤️ 加進阿亮那則的 react)。絕不可為了 react 或已讀狀態建立空白訊息(text 空的 msg 是錯誤)。
 - text 只放角色真的打出來的文字。劇本裡的括號註記——(轉折)(高潮)(已讀)(略)(草稿)(react)等——是給你的舞台指示,**絕不可抄進 text**:轉折/高潮照常填內容不含標記;(略)=獨立 skip 分隔則;草稿=settings.draft;已讀=read 欄位。
-- 劇本的方括號記法=非文字訊息,轉成對應 kind,描述文字不進 text:[貼圖:描述]→kind:"sticker",img:null,imgDesc:"描述";[圖片:描述]→kind:"image",img:null,imgDesc:"描述";[語音 0:12:…]→kind:"voice",dur:"0:12";[檔案:xx.pdf 2.4MB]→kind:"file",fname,fsize。imgDesc 一定要帶(之後 AI 補圖靠它)。
+- 劇本的方括號記法=非文字訊息,轉成對應 kind,描述文字不進 text:[貼圖:描述]→kind:"sticker",img:null,imgDesc:"描述";[圖片:描述]→kind:"image",img:null,imgDesc:"描述";[語音 0:12:…]→kind:"voice",dur:"0:12";[檔案:xx.pdf 2.4MB]→kind:"file",fname,fsize。imgDesc 一定要帶(之後 AI 補圖靠它)。這些非文字訊息**一樣要寫 side**,是別人傳的就要一併帶 personId——漏掉會變成一則沒有頭像的訊息。
 - 「(引用某人的「原文」)自己的話」→ 該則訊息 quote:{name:"某人",text:"原文"},text 只放自己的話;「[日期:7月17日 (四)]」→ {type:"date",text:"7月17日 (四)"}。
 - read 欄位只在 side:"right"(自己的綠泡泡)有意義;left 訊息不放 read。「已讀不回」=right 訊息 read:"已讀"+下一則時間拉開。
 - 時間照台灣 LINE 慣例如「下午4:06」,前後訊息時間要合理遞增。連續同 personId 的 left 訊息會自動省略頭像暱稱。

@@ -60,11 +60,28 @@
     return filename.replace(/\.[^./]+$/, '') + '.' + ext;
   }
 
+  // 補齊殘缺的 left 訊息:AI 產 [貼圖:…]/[圖片:…] 時偶爾漏掉 side 與 personId。
+  // 渲染器把「不是 right」當左邊,補位與分組卻只認 side==='left',這種列會從縫裡漏下去,
+  // 畫面上就是一格沒有頭像的空白。統一成「不是 right 就是 left」,personId 跟前一位左邊發話者。
+  function normalizeSides(s) {
+    const people = (s && s.people) || [];
+    if (!people.length || !s || !Array.isArray(s.messages)) return 0;
+    const ids = new Set(people.map((p) => p.id));
+    let last = people[0].id, fixed = 0;
+    for (const m of s.messages) {
+      if (m.type !== 'msg' || m.side === 'right') continue;
+      if (m.side !== 'left') { m.side = 'left'; fixed++; }
+      if (!ids.has(m.personId)) { m.personId = last; fixed++; }
+      last = m.personId;
+    }
+    return fixed;
+  }
+
   // 老使用者手動「載入內建範例」時,只挑草稿裡還沒有的(按 name 去重,不重複塞、不動現有草稿)
   function presetsToLoad(presets, existingNames) {
     const have = new Set(existingNames || []);
     return (presets || []).filter((p) => !have.has(p && p.name));
   }
 
-  root.LCM_PURE = { isChromaGreen, chromaKeyData, planGrid, cellRect, validateFillCells, safeFileName, downloadName, presetsToLoad };
+  root.LCM_PURE = { isChromaGreen, chromaKeyData, planGrid, cellRect, validateFillCells, safeFileName, downloadName, normalizeSides, presetsToLoad };
 })(typeof window !== 'undefined' ? window : globalThis);
