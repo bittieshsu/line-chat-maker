@@ -155,6 +155,7 @@ async function boot() {
   if (navigator.storage && navigator.storage.persist) navigator.storage.persist().catch(() => {});
   render();
   importFromQuery();
+  if (new URLSearchParams(location.search).get('wall') === 'display') wallDisplayMode();
 }
 
 const $ = (sel) => document.querySelector(sel);
@@ -1028,6 +1029,196 @@ $('#draft-new').addEventListener('click', async () => {
 });
 $('#load-presets').addEventListener('click', loadPresetsToDrafts);
 document.querySelector('.tabs [data-pane="drafts"]').addEventListener('click', renderDrafts);
+
+// ── 共享區 ──
+// 作品本體不存在這裡:牆上只有短碼索引,內容照樣向 shorturl 取,跟分享連結同一條路。
+// 端點可用 localStorage 的 lcm-wall-api 覆寫,只給本機對著 wrangler dev 驗收用;正式站不會有這個值。
+const WALL_API = (() => { try { return localStorage.getItem('lcm-wall-api') || 'https://lcm-ai-proxy.yazelinj303.workers.dev'; } catch (e) { return 'https://lcm-ai-proxy.yazelinj303.workers.dev'; } })();
+const WALL_EVENT = 'chat-2026-08-12';
+const WALL_OWN_KEY = 'lcm-wall-own'; // { 作品id: ownerToken },只存在這台瀏覽器,換裝置就找不回自己的作品
+
+const wallOwn = () => { try { return JSON.parse(localStorage.getItem(WALL_OWN_KEY)) || {}; } catch (e) { return {}; } };
+const wallOwnSet = (id, token) => { const m = wallOwn(); m[id] = token; try { localStorage.setItem(WALL_OWN_KEY, JSON.stringify(m)); } catch (e) {} };
+const wallOwnDel = (id) => { const m = wallOwn(); delete m[id]; try { localStorage.setItem(WALL_OWN_KEY, JSON.stringify(m)); } catch (e) {} };
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+
+async function wallList() {
+  const r = await fetch(WALL_API + '/api/wall/events/' + WALL_EVENT + '/submissions');
+  const d = await r.json();
+  return Array.isArray(d.submissions) ? d.submissions : [];
+}
+
+async function wallFetchState(code) { // 作品本體在既有短碼服務,共享區只有索引
+  const r = await fetch(SHORTURL_API + '/api/template/' + encodeURIComponent(code));
+  const d = await r.json();
+  if (!d || !d.state || !Array.isArray(d.state.messages)) throw new Error('這份作品讀不回來');
+  return d.state;
+}
+
+// ponytail: 一次只活一份。render() 只認全域 state 與單一 #phone,同頁要活 N 份得改寫渲染器
+// 或開 N 個 iframe,兩個都太重;真的需要多份同時動再說。這招跟匯出內嵌片段用的是同一個做法。
+function wallSnapshot(incoming) {
+  const keep = state;
+  state = migrate(incoming); render();
+  const shot = $('#phone').cloneNode(true);
+  state = keep; render();
+  shot.removeAttribute('id');
+  return shot;
+}
+
+async function wallPreview(s) {
+  let incoming;
+  try { incoming = await wallFetchState(s.code); } catch (e) { toast('這份作品讀不回來'); return; }
+  const mask = el('div', 'wall-mask');
+  const box = el('div', 'wall-modal');
+  const head = el('div', 'wall-modal-head');
+  const ttl = el('span', 'wall-modal-title');
+  ttl.textContent = (s.title || '未命名') + '・' + s.display_name;
+  const use = el('button'); use.textContent = '打開來用';
+  const close = el('button'); close.textContent = '關閉';
+  use.addEventListener('click', () => { mask.remove(); wallOpen(s); });
+  close.addEventListener('click', () => mask.remove());
+  mask.addEventListener('click', (e) => { if (e.target === mask) mask.remove(); });
+  head.append(ttl, use, close);
+  box.append(head, wallSnapshot(incoming));
+  mask.append(box);
+  document.body.append(mask);
+}
+
+async function wallOpen(s) { // 走跟 ?id= 完全一樣的路徑:一律開成新草稿,不覆蓋
+  let incoming;
+  try { incoming = await wallFetchState(s.code); } catch (e) { toast('這份作品讀不回來'); return; }
+  activate(await adoptIncoming(incoming));
+  render(); renderDrafts();
+  document.querySelector('.tabs [data-pane="chatset"]').click();
+  toast('已開成新草稿,你原本的創作都在「草稿」分頁');
+}
+
+async function wallDelete(s) {
+  const token = wallOwn()[s.id];
+  if (!token) { toast('這不是你投的作品'); return; }
+  if (!confirm('確定要把「' + (s.title || '未命名') + '」從共享區移掉?')) return;
+  const r = await fetch(WALL_API + '/api/wall/submissions/' + s.id, { method: 'DELETE', headers: { authorization: 'Bearer ' + token } });
+  if (r.ok) { wallOwnDel(s.id); toast('已移除'); renderWall(); }
+  else toast('移除失敗,重新整理再試一次');
+}
+
+async function renderWall() {
+  const box = $('#wall-list');
+  if (!box) return;
+  box.innerHTML = '<p class="hint">載入中…</p>';
+  let items = [];
+  try { items = await wallList(); } catch (e) { box.innerHTML = '<p class="hint">共享區連不上,等一下再試。</p>'; return; }
+  if (!items.length) { box.innerHTML = '<p class="hint">還沒有人投稿,你可以當第一個。</p>'; return; }
+  const own = wallOwn();
+  box.innerHTML = '';
+  items.forEach((s) => {
+    const row = el('div', 'wall-item');
+    const meta = el('div', 'wall-meta');
+    meta.innerHTML = '<strong>' + esc(s.title || '未命名') + '</strong><span>' + esc(s.display_name) + '・' + (s.msg_count || 0) + ' 則・' + fmtTime(Date.parse(s.created_at)) + '</span>';
+    const acts = el('div', 'wall-acts');
+    const prev = el('button'); prev.textContent = '預覽'; prev.addEventListener('click', () => wallPreview(s));
+    const open = el('button'); open.textContent = '打開來用'; open.addEventListener('click', () => wallOpen(s));
+    acts.append(prev, open);
+    if (own[s.id]) { const d = el('button', 'danger'); d.textContent = '刪除'; d.addEventListener('click', () => wallDelete(s)); acts.append(d); }
+    row.append(meta, acts);
+    box.append(row);
+  });
+}
+
+async function wallShortCode() { // 產生(或沿用)這份作品的短碼;同內容同碼,寫入會去重
+  // app 欄位不能省:shorturl 靠它決定雜湊哪一段內容,漏了會被當成別的產品的請求擋掉
+  const r = await fetch(SHORTURL_API + '/api/short-url', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ app: 'line-chat-maker', state }),
+  });
+  const d = await r.json();
+  const code = String(d.code || '').trim();
+  if (!/^[a-f0-9]{8,16}$/.test(code)) throw new Error('短碼產不出來,等一下再試');
+  return code;
+}
+
+// 展示模式:給簡報 iframe 嵌用(?wall=display)。整頁只放一份放大的作品,左右鍵切換,
+// 每 2 秒輪詢一次,有人投稿兩秒後投影片就自己長出來。
+async function wallDisplayMode() {
+  document.body.classList.add('wall-display');
+  const stage = el('div', 'wall-stage');
+  const cap = el('div', 'wall-cap');
+  document.body.append(stage, cap);
+  let items = [], idx = 0, shown = null;
+
+  const paint = async () => {
+    const s = items[idx];
+    if (!s) { cap.textContent = '還沒有人投稿'; return; }
+    if (s.code === shown) return;
+    shown = s.code;
+    let incoming;
+    try { incoming = await wallFetchState(s.code); } catch (e) { cap.textContent = '這份讀不回來'; return; }
+    stage.innerHTML = '';
+    const shot = wallSnapshot(incoming);
+    stage.append(shot);
+    cap.textContent = (s.title || '未命名') + '・' + s.display_name + '　(' + (idx + 1) + '/' + items.length + ')';
+    fit(shot);
+  };
+
+  // 簡報是用 iframe 嵌這一頁的,高度可能只有幾百 px,不縮的話手機會被切掉、字幕也擠出畫面
+  const fit = (shot) => {
+    stage.style.transform = 'none'; stage.style.height = 'auto';
+    const h = shot.getBoundingClientRect().height || 1;
+    const avail = innerHeight - 72; // 留給字幕與上下留白
+    const k = Math.min(1, avail / h);
+    stage.style.transform = 'scale(' + k.toFixed(3) + ')';
+    stage.style.height = Math.round(h * k) + 'px';
+  };
+  addEventListener('resize', () => { const shot = stage.firstElementChild; if (shot) fit(shot); });
+
+  const poll = async () => {
+    let next;
+    try { next = await wallList(); } catch (e) { return; }
+    const grew = next.length > items.length;
+    items = next;
+    if (grew) { idx = 0; shown = null; } // 有新作品就跳到最新那份
+    paint();
+  };
+
+  addEventListener('keydown', (e) => {
+    if (items.length < 2) return;
+    if (e.key === 'ArrowRight') { idx = (idx + 1) % items.length; shown = null; paint(); }
+    if (e.key === 'ArrowLeft') { idx = (idx - 1 + items.length) % items.length; shown = null; paint(); }
+  });
+
+  await poll();
+  setInterval(poll, 2000);
+}
+
+document.querySelector('.tabs [data-pane="wall"]').addEventListener('click', renderWall);
+$('#wall-refresh').addEventListener('click', renderWall);
+$('#wall-submit').addEventListener('click', async () => {
+  const name = $('#wall-name').value.trim();
+  const uploadCode = $('#wall-code').value.trim();
+  if (!name) { $('#wall-name').focus(); toast('請填顯示名稱'); return; }
+  if (!uploadCode) { $('#wall-code').focus(); toast('請填現場公布的活動碼'); return; }
+  if (!$('#wall-consent').checked) { toast('請勾選展示同意'); return; }
+  const btn = $('#wall-submit'); btn.disabled = true; btn.textContent = '投稿中';
+  try {
+    const code = await wallShortCode();
+    const r = await fetch(WALL_API + '/api/wall/submissions', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        event: WALL_EVENT, code, name,
+        title: $('#wall-title').value.trim() || (state.settings && state.settings.title) || '',
+        msgCount: state.messages.length, consent: true, uploadCode,
+      }),
+    });
+    const d = await r.json();
+    if (!r.ok) throw new Error((d.error && d.error.message) || '投稿失敗');
+    wallOwnSet(d.submission.id, d.ownerToken);
+    $('#wall-post').open = false;
+    toast('投稿成功,大家看得到了');
+    renderWall();
+  } catch (e) { toast(e.message || '投稿失敗'); }
+  finally { btn.disabled = false; btn.textContent = '投稿'; }
+});
 
 // ── 腳本 JSON 進出 ──
 $('#export-json').addEventListener('click', () => {

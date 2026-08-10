@@ -68,6 +68,9 @@
 node test/pure.test.mjs        # 去背/幾何/檔名等純邏輯
 node test/skin-gate.test.mjs   # skin 選擇
 node test/webmcp.e2e.mjs       # WebMCP 端到端（要本機有 google-chrome；CHROME=/snap/bin/chromium 可換瀏覽器）
+node test/wall-lib.test.mjs    # 共享區純邏輯
+node test/wall.e2e.mjs         # 共享區端點（自己起 wrangler dev 打本機 D1）
+node test/wall-ui.e2e.mjs      # 共享區前端（自己起靜態站與 wrangler dev，開真瀏覽器跑一輪）
 ```
 
 ## 聲明與防濫用

@@ -23,6 +23,9 @@ CODEX_IMAGE_BASE = "https://ching-tech.ddns.net/codex-image"
 IMG_IP_DAILY = "2"
 IMG_GLOBAL_DAILY = "20"
 
+# 共享區梯次代號(投稿與清單都用它);換梯次改這裡
+WALL_EVENT = "chat-2026-08-12"
+
 # 額度計數用 D1(沿用既有庫,只新增 lcm_quota 表;自架請換成自己的庫)
 [[d1_databases]]
 binding = "DB"
@@ -31,5 +34,9 @@ database_id = "843337b7-ef58-4e6a-8e12-759e5d5b379c"
 
 # GROQ_API_KEY 走 secret,不放這裡:
 #   cd worker && npx wrangler secret put GROQ_API_KEY
+# WALL_UPLOAD_CODE 走 secret(共享區活動碼,沒設=不開放投稿):
+#   cd worker && npx wrangler secret put WALL_UPLOAD_CODE
+# WALL_ADMIN_TOKEN 走 secret(主持人管理權杖,能刪任何一筆):
+#   cd worker && npx wrangler secret put WALL_ADMIN_TOKEN
 # LLMSHARE_API_KEY 走 secret(朋友的 GLM 虛擬 key,絕不放這裡/前端;沒設時編劇自動退回 Groq):
 #   cd worker && npx wrangler secret put LLMSHARE_API_KEY

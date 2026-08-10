@@ -37,6 +37,7 @@
       <button class="tab" data-pane="ai">AI</button>
       <button class="tab" data-pane="exportset">匯出</button>
       <button class="tab" data-pane="drafts">草稿</button>
+      <button class="tab" data-pane="wall">共享區</button>
     </nav>
 
     <section class="pane active" id="pane-chatset">
@@ -177,6 +178,20 @@
     <p class="hint">每份創作都自動即時保存在這台裝置;開別人的分享連結或匯入 JSON 會開成新草稿,不會覆蓋。跨裝置或長期備份請用「匯出腳本 JSON」。</p>
     <div class="addbar"><button id="draft-new" type="button">新增空白草稿</button><button id="load-presets" type="button" title="把內建的示範草稿補進來(已有的略過,不動你現有草稿)">載入內建範例</button></div>
     <div id="draft-list"></div>
+    </section>
+
+    <section class="pane" id="pane-wall">
+    <p class="hint">大家的作品都在這裡。點「預覽」看，點「打開來用」會複製成你的新草稿，不會蓋掉你手上的東西。</p>
+    <div class="addbar"><button id="wall-refresh" type="button">重新整理</button></div>
+    <div id="wall-list"></div>
+    <details id="wall-post">
+      <summary>把我的作品放上去</summary>
+      <label>顯示名稱 <input id="wall-name" type="text" maxlength="20" placeholder="牆上要顯示的名字"></label>
+      <label>標題(留空就用聊天室名稱) <input id="wall-title" type="text" maxlength="40" placeholder="例:冷凍庫裡的鞋"></label>
+      <label>活動碼 <input id="wall-code" type="text" placeholder="現場公布的活動碼"></label>
+      <label class="chk"><input id="wall-consent" type="checkbox"> 我同意這份作品顯示在本次活動的共享區與現場投影。錄影或日後宣傳會另外詢問。</label>
+      <div class="addbar"><button id="wall-submit" type="button">投稿</button></div>
+    </details>
     </section>
   </aside>
 

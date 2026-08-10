@@ -2,13 +2,15 @@
    Groq key 只存在 Cloudflare secret,絕不進前端。
    五道閘:Origin 白名單 / model 鎖定+請求形狀 / 每 IP 每日額度 / 全站每日熔斷 / max_tokens 上限。
    自架:見同目錄 README.md。 */
+import { handleWall } from './wall.js';
+
 export default {
   async fetch(req, env) {
     const origin = req.headers.get('Origin') || '';
     const okOrigin = (env.ALLOWED_ORIGINS || '').split(',').map((s) => s.trim()).filter(Boolean).includes(origin);
     const cors = {
       'access-control-allow-origin': okOrigin ? origin : 'null',
-      'access-control-allow-methods': 'GET, POST, OPTIONS',
+      'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS', // PATCH/DELETE 是共享區改標題與刪除用的
       'access-control-allow-headers': 'content-type, authorization',
       'access-control-max-age': '86400',
     };
@@ -84,7 +86,12 @@ export default {
       return err(404, 'images 路由:POST /images/jobs、GET /images/jobs/<id>、GET /images/file?p=/generated/xx.png。');
     }
 
-    if (req.method !== 'POST' || pathname !== '/chat/completions') return err(404, '這個免費代理只有 POST /chat/completions、GET /quota 與 /images/*。');
+    { // 共享區:自己處理權限與 CORS,不吃 AI 額度;不是它的路徑會回 null 讓下面繼續
+      const res = await handleWall(req, env, cors, err, okOrigin);
+      if (res) return res;
+    }
+
+    if (req.method !== 'POST' || pathname !== '/chat/completions') return err(404, '這個免費代理只有 POST /chat/completions、GET /quota、/images/* 與 /api/wall/*。');
     if (!okOrigin) return err(403, '這個免費代理只服務 line-chat-maker 網頁。想自架:repo 的 worker/ 目錄照 README 部署,用自己的 key。');
 
     const raw = await req.text();

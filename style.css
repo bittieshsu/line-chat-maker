@@ -459,3 +459,32 @@ body.dark .ai-quota { background: #1f2126; border-color: #33363c; color: #9aa0a8
 @keyframes inkIn { 0%{opacity:0;transform:scale(.96) translateY(5px);filter:blur(2.5px)} 60%{opacity:1;filter:blur(.8px)} 100%{opacity:1;transform:none;filter:blur(0)} }
 /* 造型挖孔:朱紅毛筆點評圈(乾淨紅圈,不用濾鏡以免糊掉) */
 .phone.skin-ink .notch.skinhole { background: transparent; border: 3px solid #bb3b2b; border-radius: 50%; clip-path: none; box-shadow: 0 0 0 1px rgba(187,59,43,.15); top: 9px; width: 22px; height: 22px; }
+
+/* ── 共享區 ── */
+.wall-item { display: flex; flex-wrap: wrap; align-items: center; gap: 0.3rem 0.5rem; padding: 0.45rem 0.5rem; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 0.5rem; }
+.wall-meta { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; flex: 1 1 8rem; }
+.wall-meta strong { font-weight: 600; overflow-wrap: anywhere; }
+.wall-meta span { font-size: 0.78rem; color: var(--muted); }
+.wall-acts { display: flex; gap: 0.3rem; margin-left: auto; }
+.wall-acts button { font-size: 0.8rem; padding: 0.15rem 0.5rem; border: 1px solid var(--border); background: #fff; border-radius: 8px; cursor: pointer; }
+.wall-acts button:hover { border-color: var(--accent); color: var(--accent); }
+.wall-acts button.danger:hover { border-color: #d33; color: #d33; }
+#wall-post { margin-top: 0.8rem; border-top: 1px solid var(--border); padding-top: 0.6rem; }
+#wall-post summary { cursor: pointer; font-size: 0.9rem; }
+#wall-post label { display: block; margin: 0.5rem 0; font-size: 0.85rem; }
+#wall-post label.chk { display: flex; gap: 0.4rem; align-items: flex-start; font-size: 0.78rem; color: var(--muted); line-height: 1.5; }
+#wall-post input[type="text"] { width: 100%; }
+
+/* 預覽:一次只活一份,覆蓋層裡放真的渲染出來的手機 */
+.wall-mask { position: fixed; inset: 0; background: rgba(0, 0, 0, 0.55); display: flex; align-items: center; justify-content: center; padding: 2vh 2vw; z-index: 60; overflow: auto; }
+.wall-modal { background: #fff; border-radius: 14px; padding: 0.8rem; max-height: 96vh; overflow: auto; }
+.wall-modal-head { display: flex; align-items: center; gap: 0.5rem; margin-bottom: 0.6rem; }
+.wall-modal-title { flex: 1 1 auto; font-weight: 600; overflow-wrap: anywhere; }
+.wall-modal-head button { border: 1px solid var(--border); background: #fff; border-radius: 8px; padding: 0.25rem 0.6rem; font-size: 0.85rem; cursor: pointer; }
+.wall-modal-head button:hover { border-color: var(--accent); color: var(--accent); }
+
+/* 展示模式:整頁只有作品,給簡報 iframe 嵌 */
+body.wall-display > *:not(.wall-stage):not(.wall-cap) { display: none !important; }
+.wall-stage { transform-origin: top center; }
+body.wall-display { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; min-height: 100vh; margin: 0; background: #f4f2ee; }
+.wall-cap { font-size: 1.05rem; color: var(--fg); }
