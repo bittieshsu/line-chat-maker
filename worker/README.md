@@ -5,12 +5,21 @@
 ## 防濫用五道閘
 
 1. **Origin 白名單**（`ALLOWED_ORIGINS`）：只服務指定網域，其他一律 403
-2. **model 鎖定＋欄位白名單**（`MODEL`）：不接受前端指定其他 model，只轉發 `messages/tools/tool_choice`，不當萬用 LLM 代理
+2. **model 鎖定＋欄位白名單**（`MODEL`／`WRITER_MODELS`）：只轉發 `messages/tools/tool_choice`，不當萬用 LLM 代理。前端送來的 model 若在 `WRITER_MODELS` 白名單上，轉給 `LLMSHARE_BASE`（朋友的閘道）；**不在名單上的一律改寫成 `MODEL` 走 Groq**，不會照你填的跑
 3. **每 IP 每日額度**（`IP_DAILY`，預設 60 次呼叫 ≈ 3 個作品）：超過回 429，訊息引導使用者填自己的免費 Key
 4. **全站每日熔斷**（`GLOBAL_DAILY`，預設 1200 次）：成本天花板 ≈ 每日 US$1.2、每月 US$36 封頂；實際流量通常遠低於此
 5. **max_tokens 上限**：單次輸出封頂 4096
 
-額度計數存 D1（`lcm_quota` 表，首次請求自動建表），UTC 日界（台北時間早上 8 點重置）。只記「日期＋IP＋次數」，**不儲存任何對話內容**。
+額度計數存 D1（`lcm_quota` 表，首次請求自動建表），UTC 日界（台北時間早上 8 點重置）。只記「日期＋IP＋次數」，**不儲存任何對話內容**。計數在通過檢查、確定要送去上游時才加；被 429 擋下來的請求不計。
+
+## 兩條上游
+
+| 送出的 model | 去哪 | 吃哪一格額度 |
+|---|---|---|
+| 在 `WRITER_MODELS` 名單上（預設 `glm-5.2,glm-5.1,gpt-oss:120b,gpt-oss:20b,deepseek-v4-flash:0731`） | `LLMSHARE_BASE`，用 `LLMSHARE_API_KEY` | 編劇（`GLM_IP_DAILY`／`GLM_GLOBAL_DAILY`）**和**文字，兩格都扣 |
+| 其他任何值 | Groq，model 被改寫成 `MODEL` | 只扣文字 |
+
+名單走 llm-share 的那條是**別人的 key**。每 IP 的次數閘擋得住量，擋不住單價，所以名單刻意只放中小型模型；要加大模型先問過對方。另外那條的額度比較緊（預設每 IP 20 次），拿它跑「執行 AI」的話一個作品約 20 次呼叫就見底，要用得先把 `GLM_IP_DAILY` 調高。
 
 ## 部署（站長）
 
