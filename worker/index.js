@@ -101,8 +101,11 @@ export default {
     try { body = JSON.parse(raw); } catch { return err(400, '請求不是合法 JSON。'); }
     if (!Array.isArray(body.messages) || !body.messages.length || body.messages.length > 150) return err(400, 'messages 格式不對。');
 
-    const writerModel = env.WRITER_MODEL || 'glm-5.2';
-    const wantWriter = body.model === writerModel && !!env.LLMSHARE_API_KEY; // 編劇=glm-5.2 路由到朋友的 llm-share
+    // 白名單:只有清單上的 model 會轉給朋友的 llm-share,其餘一律鎖 Groq(這不是萬用 LLM 代理)。
+    // 用清單而不是單一字串,是因為那台上面有十幾個模型;但別把大模型放進來,這是公開網站,
+    // 打的是別人的 key。WRITER_MODEL 保留相容,沒設 WRITER_MODELS 時照舊。
+    const writerModels = String(env.WRITER_MODELS || env.WRITER_MODEL || 'glm-5.2').split(',').map((s) => s.trim()).filter(Boolean);
+    const wantWriter = writerModels.includes(body.model) && !!env.LLMSHARE_API_KEY;
 
     // 額度:每 IP 每日+全站熔斷(D1;表不存在時自建一次)
     const day = new Date().toISOString().slice(0, 10); // UTC 日界,台北時間早上 8 點重置
@@ -137,11 +140,15 @@ export default {
     let clean, upURL, upHeaders;
     if (wantWriter) {
       clean = {
-        model: writerModel,
+        model: body.model, // 已經過白名單,不是任意字串
         messages: body.messages,
         max_tokens: Math.max(1, Math.min(+body.max_tokens || 8192, 8192)),
-        reasoning_effort: 'none', // GLM 是思考型:不關掉會把預算全花在 reasoning、content 回空白
       };
+      if (/^glm-/.test(body.model)) clean.reasoning_effort = 'none'; // GLM 是思考型:不關掉會把預算全花在 reasoning、content 回空白
+      // 工具要帶過去。原本這條分支沒帶,所以執行 AI 一改用這邊的模型,tool-calling 迴圈就整個失效,
+      // 它會改用散文回答。實測 gpt-oss:120b、glm-5.2、deepseek-v4-pro 在那台上都正常回 tool_calls。
+      if (Array.isArray(body.tools)) clean.tools = body.tools;
+      if (body.tool_choice !== undefined) clean.tool_choice = body.tool_choice;
       upURL = (env.LLMSHARE_BASE || 'https://llm-share.duotify.com/v1').replace(/\/+$/, '') + '/chat/completions';
       upHeaders = { 'content-type': 'application/json', authorization: 'Bearer ' + env.LLMSHARE_API_KEY, 'user-agent': 'lcm-ai-proxy/1.0' };
     } else {
