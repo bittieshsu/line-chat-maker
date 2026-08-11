@@ -708,7 +708,10 @@ async function runFillImages() {
   } catch (e) {
     log(e.name === 'AbortError' ? '已停止。' : '補圖失敗:' + e.message, 'err');
     if (readPending()) log('後端可能仍在生成;稍後可按「取回上次補圖」把已生成的結果切回。', 'warn');
-    toast('AI 補圖失敗,詳見 AI 分頁紀錄');
+    // 失敗時一定要講出接力這條路。提示在送出生圖前就寫進草稿了,但那顆「提示」鈕要 hover
+    // 才看得到,不講的話沒有人找得到,等於白做。
+    if (e.name !== 'AbortError') log('提示已經留在每一格了:滑到那張圖上按「提示」複製出去,用你自己的 ChatGPT／Gemini 生完,再點那張圖上傳回來。', 'warn');
+    toast('AI 補圖失敗;滑到圖上按「提示」可以複製出去自己生');
   }
   aborter = null; imgAbort = false;
   setBusy(false);
