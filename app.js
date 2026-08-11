@@ -1365,7 +1365,8 @@ function copyImgPrompt(m) {
   const style = m.kind === 'sticker'
     ? '。Q版可愛貼圖風格,主體置中,背景單一純色方便去背,無文字'
     : '。真實手機隨手拍質感';
-  const full = (m.imgPrompt || '') + style;
+  // 美術指導寫的提示多半已經以句號收尾,直接接上去會變成「…貼紙盒。。真實手機隨手拍質感」
+  const full = String(m.imgPrompt || '').replace(/[。．.]\s*$/, '') + style;
   const done = () => toast(m.kind === 'sticker'
     ? '已複製提示;在外部 AI 生成後自己去背成透明 PNG,再點這張圖換上來'
     : '已複製提示;在外部 AI 生成後,點這張圖換上來');

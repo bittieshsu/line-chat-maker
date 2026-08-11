@@ -735,7 +735,8 @@ window.lcmRegenImage = async (msgIndex) => { // 單格重生(app.js 的 hover �
   log('單格重生:' + m.imgPrompt.slice(0, 40), 'prompt');
   try {
     const style = m.kind === 'sticker' ? '。Q版可愛貼圖風格,主體置中,背景整片純綠色,無文字' : '。真實手機隨手拍質感';
-    const img = await generateBitmap(m.imgPrompt + style, '1024x1024');
+    // 提示多半已經以句號收尾,直接接會變成「…。。真實手機隨手拍質感」
+    const img = await generateBitmap(String(m.imgPrompt).replace(/[。．.]\s*$/, '') + style, '1024x1024');
     m.img = drawSlot(img, 0, 0, img.width, img.height, m.kind);
     aiUndoStack.push({ draftId: currentId, snap: before });
     if (aiUndoStack.length > 20) aiUndoStack.shift();
