@@ -271,6 +271,13 @@ async function chat(msgs, force, noTools, useCfg) {
   }
   const m = d.choices && d.choices[0] && d.choices[0].message;
   if (!m) throw new Error('模型沒有回傳訊息。');
+  // 思考型模型把思考放在 reasoning_content、答案放在 content。預算不夠時它會把額度全花在思考,
+  // content 回空白,而呼叫端只會拿到空字串然後安靜結束,使用者完全不知道發生什麼事。
+  // 明講出來,並指出這是模型的問題不是他的問題。
+  if (!textOf(m) && !(m.tool_calls || []).length) {
+    const think = String(m.reasoning_content || m.reasoning || '').trim();
+    if (think) log(`「${c.model}」把額度全花在思考上,正文回了空白(思考 ${think.length} 字)。換一個模型,或把這個模型的輸出長度調大。`, 'err');
+  }
   return m;
 }
 
