@@ -157,8 +157,9 @@ async function boot() {
   importFromQuery();
   const q = new URLSearchParams(location.search);
   if (q.get('wall') === 'display') wallDisplayMode();
+  if (q.get('wall') === 'gallery') wallGalleryMode();
   // ?code=xxx 自動帶入活動碼:現場少一個打錯字的環節。伺服器端照樣驗,前端只是省打字。
-  if (q.get('code') && q.get('wall') !== 'display') wallPrefillCode(q.get('code'));
+  if (q.get('code') && !q.get('wall')) wallPrefillCode(q.get('code'));
 }
 
 const $ = (sel) => document.querySelector(sel);
@@ -1232,6 +1233,87 @@ async function wallDisplayMode() {
     if (e.key === 'ArrowRight') { idx = (idx + 1) % items.length; shown = null; paint(); }
     if (e.key === 'ArrowLeft') { idx = (idx - 1 + items.length) % items.length; shown = null; paint(); }
   });
+
+  await poll();
+  setInterval(poll, 2000);
+}
+
+// 畫廊模式(?wall=gallery):一次看得到三份左右,連續向左平移,到底無縫接回開頭。
+// 跟 ?wall=display 的差別是那個一次一份、要按鍵切換;這個像旋轉木馬,適合當背景一直跑。
+// 無縫的做法是把整組作品複製一份接在後面,平移超過一組寬度就把位移減掉一組寬度,視覺上接不出來。
+async function wallGalleryMode() {
+  document.body.classList.add('wall-gallery');
+  const rail = el('div', 'wall-rail');
+  const empty = el('div', 'wall-cap');
+  empty.textContent = '還沒有人投稿';
+  document.body.append(rail, empty);
+
+  const GAP = 24, COLS = 3, SPEED = 0.45; // px/frame,約 27px/秒,慢到可以讀完一則
+  const cards = new Map(); // code → 本尊卡片(複製品不進這裡)
+  let setW = 0, off = 0, paused = false;
+
+  // 每張都縮到「橫向剛好排得下三份」與「直向裝得進畫面」兩者取小
+  const fit = (card) => {
+    const wrap = card.firstElementChild, shot = wrap.firstElementChild;
+    shot.style.transform = 'none';
+    const r = shot.getBoundingClientRect();
+    const cw = (innerWidth - GAP * (COLS + 1)) / COLS;
+    const k = Math.min(cw / (r.width || 1), (innerHeight - 96) / (r.height || 1));
+    shot.style.transform = 'scale(' + k.toFixed(3) + ')';
+    wrap.style.width = Math.round(r.width * k) + 'px';
+    wrap.style.height = Math.round(r.height * k) + 'px';
+  };
+
+  const relayout = () => {
+    rail.querySelectorAll('.wall-card.dup').forEach((n) => n.remove());
+    const real = [...cards.values()];
+    real.forEach(fit);
+    // 手機是直的,寬高比讓「高度裝得下」幾乎總是先撞到上限,縮完一排會塞下四五份。
+    // 所以間距改成算出來的:讓三份剛好撐滿一畫面,多的自然被推出畫面外。
+    const cardW = Math.max(...real.map((c) => c.getBoundingClientRect().width), 1);
+    const gap = Math.max(GAP, (innerWidth - COLS * cardW) / (COLS + 1));
+    rail.style.gap = Math.round(gap) + 'px';
+    rail.style.padding = '0 ' + Math.round(gap) + 'px';
+    setW = real.reduce((a, c) => a + c.getBoundingClientRect().width + gap, 0);
+    // 排不滿一畫面就不用跑,也不用複製;三份以內就是靜態並排
+    if (setW > innerWidth) real.forEach((c) => { const d = c.cloneNode(true); d.classList.add('dup'); rail.append(d); });
+    else { off = 0; rail.style.transform = 'none'; }
+  };
+
+  const add = async (s) => {
+    let incoming;
+    try { incoming = await wallFetchState(s.code); } catch (e) { return; }
+    const card = el('div', 'wall-card');
+    const wrap = el('div', 'wall-shot');
+    wrap.append(wallSnapshot(incoming));
+    const cap = el('div', 'wall-cap');
+    cap.textContent = (s.title || '未命名') + '・' + s.display_name;
+    card.append(wrap, cap);
+    rail.append(card);
+    cards.set(s.code, card);
+  };
+
+  const poll = async () => {
+    let next;
+    try { next = await wallList(); } catch (e) { return; }
+    let grew = false;
+    for (const s of next) if (!cards.has(s.code)) { await add(s); grew = true; }
+    if (grew) relayout();
+    empty.style.display = cards.size ? 'none' : '';
+  };
+
+  const tick = () => {
+    if (!paused && setW > innerWidth) {
+      off += SPEED;
+      if (off >= setW) off -= setW; // 走完一整組就把位移歸零,接上複製品那組,看不出接縫
+      rail.style.transform = 'translateX(' + (-off).toFixed(1) + 'px)';
+    }
+    requestAnimationFrame(tick);
+  };
+  // 現場看到好笑的想停下來講:點一下暫停,再點一下繼續
+  addEventListener('click', () => { paused = !paused; });
+  addEventListener('resize', relayout);
+  requestAnimationFrame(tick);
 
   await poll();
   setInterval(poll, 2000);

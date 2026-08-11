@@ -490,3 +490,13 @@ body.wall-display > *:not(.wall-stage):not(.wall-cap) { display: none !important
 .wall-stage { transform-origin: top center; }
 body.wall-display { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.8rem; min-height: 100vh; margin: 0; background: #f4f2ee; }
 .wall-cap { font-size: 1.05rem; color: var(--fg); }
+
+/* 畫廊模式:一次看得到三份,連續平移(?wall=gallery) */
+body.wall-gallery > *:not(.wall-rail):not(.wall-cap) { display: none !important; }
+body.wall-gallery { margin: 0; background: #f4f2ee; height: 100vh; overflow: hidden; display: flex; align-items: center; }
+.wall-rail { display: flex; align-items: flex-start; gap: 24px; padding: 0 24px; will-change: transform; }
+.wall-card { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.wall-card .wall-cap { font-size: 0.9rem; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
+/* 手機用 transform 縮小,外框要自己吃掉縮小後的尺寸,不然卡片之間會空一大塊 */
+.wall-shot { overflow: hidden; }
+.wall-shot > * { transform-origin: top left; }
