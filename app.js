@@ -1252,25 +1252,36 @@ async function wallGalleryMode() {
   const cards = new Map(); // code → 本尊卡片(複製品不進這裡)
   let setW = 0, off = 0, paused = false;
 
-  // 高度決定一切:手機是直的,寬度是「裝得進畫面的高度」反推出來的,一畫面看得到幾份
-  // 就讓它自然浮出來(16:9 大概四到五份)。原本硬湊「剛好三份」,間距會被撐到 228px,
-  // 幾乎跟一台手機一樣寬,看起來像手機特別瘦,其實是空隙太大。
-  const fit = (card) => {
-    const wrap = card.firstElementChild, shot = wrap.firstElementChild;
-    shot.style.transform = 'none';
-    const r = shot.getBoundingClientRect();
-    // 扣掉的不只字幕:手機的陰影是 0 24px 60px,會畫到外框下面約 84px(隨 k 一起縮)。
+  // 全部作品共用同一個縮放倍率。手機的自然寬度是固定的(24rem),高度卻被對話長度撐出來,
+  // 各算各的倍率會讓每台手機寬度都不一樣,看起來不像同一款手機,長對話那台還會被壓得又瘦又小。
+  // 共用倍率之後寬度完全一致,只有高度隨內容長短不同,像同型號的手機擺在一起。
+  // 倍率由最高的那份決定,確保沒有人超出畫面。
+  const scaleAll = (list) => {
+    let natW = 1, natH = 1;
+    for (const card of list) {
+      const shot = card.firstElementChild.firstElementChild;
+      if (!shot) continue;
+      shot.style.transform = 'none';
+      const r = shot.getBoundingClientRect();
+      natW = Math.max(natW, r.width); natH = Math.max(natH, r.height);
+    }
+    // 扣掉的不只字幕:手機的陰影是 0 24px 60px,會畫到外框下面約 84px(隨倍率一起縮)。
     // 只留字幕的高度的話,卡片垂直置中後底下不夠,陰影會在視窗底邊被切成一條硬邊。
-    const k = Math.min(innerWidth / 3 / (r.width || 1), (innerHeight - 170) / (r.height || 1));
-    shot.style.transform = 'scale(' + k.toFixed(3) + ')';
-    wrap.style.width = Math.round(r.width * k) + 'px';
-    wrap.style.height = Math.round(r.height * k) + 'px';
+    const k = Math.min(innerWidth / 3 / natW, (innerHeight - 170) / natH);
+    for (const card of list) {
+      const wrap = card.firstElementChild, shot = wrap.firstElementChild;
+      if (!shot) continue;
+      const r = shot.getBoundingClientRect();
+      shot.style.transform = 'scale(' + k.toFixed(3) + ')';
+      wrap.style.width = Math.round(r.width * k) + 'px';
+      wrap.style.height = Math.round(r.height * k) + 'px';
+    }
   };
 
   const relayout = () => {
     rail.querySelectorAll('.wall-card.dup').forEach((n) => n.remove());
     const real = [...cards.values()];
-    real.forEach(fit);
+    scaleAll(real);
     setW = real.reduce((a, c) => a + c.getBoundingClientRect().width + GAP, 0);
     // 排不滿一畫面就不用跑,也不用複製;三份以內就是靜態並排
     if (setW > innerWidth) real.forEach((c) => { const d = c.cloneNode(true); d.classList.add('dup'); rail.append(d); });
