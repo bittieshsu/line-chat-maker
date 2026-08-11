@@ -19,8 +19,10 @@ LLMSHARE_BASE = "https://llm-share.duotify.com/v1"
 # 編劇(GLM)獨立且更緊的每日額度,保護朋友的 key(Origin 可偽造,不能只靠共用的 GLOBAL_DAILY)。依朋友 key 容量調整。
 GLM_IP_DAILY = "20"
 GLM_GLOBAL_DAILY = "2000"
-# 每 IP 每日 AI 呼叫上限(約 20 次=1 個完整作品)
-IP_DAILY = "60"
+# 每 IP 每日 AI 呼叫上限(約 20 次=1 個完整作品)。拉高它不會提高花費上限,
+# 成本天花板是下面的 GLOBAL_DAILY;這道只決定「單一個人能用多少」。
+# 60 太緊的兩個原因:編劇呼叫也會扣這一格(不只製作與微調),而且 0812 現場一人可能做多個作品。
+IP_DAILY = "150"
 # 全站每日熔斷:成本天花板 = GLOBAL_DAILY x 單次呼叫成本(5000 次 ≈ US$5)。
 # 2026-08-11 為了在大群分享暫時放大,平常值是 1200。每 IP 維持 60 不動,單一個人吃不光。
 GLOBAL_DAILY = "5000"
