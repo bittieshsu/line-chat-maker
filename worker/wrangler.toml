@@ -16,8 +16,10 @@ MODEL = "openai/gpt-oss-120b"
 WRITER_MODELS = "nemotron-3-super,deepseek-v4-flash:0731,qwen3.5:397b,deepseek-v4-pro,kimi-k2.7-code,minimax-m2.7,minimax-m3,mistral-large-3:675b,glm-5.1,gpt-oss:20b,glm-5.2,gpt-oss:120b,nemotron-3-nano:30b,gemma4:31b,deepseek-v4-flash:preview,kimi-k2.6,nemotron-3-ultra"
 WRITER_MODEL = "glm-5.2" # 相容用:舊版只認這一個
 LLMSHARE_BASE = "https://llm-share.duotify.com/v1"
-# 編劇(GLM)獨立且更緊的每日額度,保護朋友的 key(Origin 可偽造,不能只靠共用的 GLOBAL_DAILY)。依朋友 key 容量調整。
-GLM_IP_DAILY = "20"
+# 走朋友閘道那條的每日額度(不只編劇:任何在 WRITER_MODELS 名單上的 model 都算這格)。
+# 2026-08-11 從 20 提到 200:20 是照「編劇只呼叫幾次」設的,但執行 AI 一個作品約 20 次呼叫,
+# 想把執行也搬過去的話 20 會在第一個作品就見底。朋友表示水管夠大。全站仍有 GLOBAL 2000 這道。
+GLM_IP_DAILY = "200"
 GLM_GLOBAL_DAILY = "2000"
 # 每 IP 每日 AI 呼叫上限(約 20 次=1 個完整作品)。拉高它不會提高花費上限,
 # 成本天花板是下面的 GLOBAL_DAILY;這道只決定「單一個人能用多少」。
