@@ -1248,19 +1248,20 @@ async function wallGalleryMode() {
   empty.textContent = '載入中';
   document.body.append(rail, empty);
 
-  const GAP = 24, COLS = 3, SPEED = 0.45; // px/frame,約 27px/秒,慢到可以讀完一則
+  const GAP = 56, SPEED = 0.45; // px/frame,約 27px/秒,慢到可以讀完一則
   const cards = new Map(); // code → 本尊卡片(複製品不進這裡)
   let setW = 0, off = 0, paused = false;
 
-  // 每張都縮到「橫向剛好排得下三份」與「直向裝得進畫面」兩者取小
+  // 高度決定一切:手機是直的,寬度是「裝得進畫面的高度」反推出來的,一畫面看得到幾份
+  // 就讓它自然浮出來(16:9 大概四到五份)。原本硬湊「剛好三份」,間距會被撐到 228px,
+  // 幾乎跟一台手機一樣寬,看起來像手機特別瘦,其實是空隙太大。
   const fit = (card) => {
     const wrap = card.firstElementChild, shot = wrap.firstElementChild;
     shot.style.transform = 'none';
     const r = shot.getBoundingClientRect();
-    const cw = (innerWidth - GAP * (COLS + 1)) / COLS;
     // 扣掉的不只字幕:手機的陰影是 0 24px 60px,會畫到外框下面約 84px(隨 k 一起縮)。
     // 只留字幕的高度的話,卡片垂直置中後底下不夠,陰影會在視窗底邊被切成一條硬邊。
-    const k = Math.min(cw / (r.width || 1), (innerHeight - 170) / (r.height || 1));
+    const k = Math.min(innerWidth / 3 / (r.width || 1), (innerHeight - 170) / (r.height || 1));
     shot.style.transform = 'scale(' + k.toFixed(3) + ')';
     wrap.style.width = Math.round(r.width * k) + 'px';
     wrap.style.height = Math.round(r.height * k) + 'px';
@@ -1270,13 +1271,7 @@ async function wallGalleryMode() {
     rail.querySelectorAll('.wall-card.dup').forEach((n) => n.remove());
     const real = [...cards.values()];
     real.forEach(fit);
-    // 手機是直的,寬高比讓「高度裝得下」幾乎總是先撞到上限,縮完一排會塞下四五份。
-    // 所以間距改成算出來的:讓三份剛好撐滿一畫面,多的自然被推出畫面外。
-    const cardW = Math.max(...real.map((c) => c.getBoundingClientRect().width), 1);
-    const gap = Math.max(GAP, (innerWidth - COLS * cardW) / (COLS + 1));
-    rail.style.gap = Math.round(gap) + 'px';
-    rail.style.padding = '0 ' + Math.round(gap) + 'px';
-    setW = real.reduce((a, c) => a + c.getBoundingClientRect().width + gap, 0);
+    setW = real.reduce((a, c) => a + c.getBoundingClientRect().width + GAP, 0);
     // 排不滿一畫面就不用跑,也不用複製;三份以內就是靜態並排
     if (setW > innerWidth) real.forEach((c) => { const d = c.cloneNode(true); d.classList.add('dup'); rail.append(d); });
     else { off = 0; rail.style.transform = 'none'; }

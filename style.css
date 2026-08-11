@@ -494,7 +494,7 @@ body.wall-display { display: flex; flex-direction: column; align-items: center; 
 /* 畫廊模式:一次看得到三份,連續平移(?wall=gallery) */
 body.wall-gallery > *:not(.wall-rail):not(.wall-cap) { display: none !important; }
 body.wall-gallery { margin: 0; background: #f4f2ee; height: 100vh; overflow: hidden; display: flex; align-items: center; }
-.wall-rail { display: flex; align-items: flex-start; gap: 24px; padding: 0 24px; will-change: transform; }
+.wall-rail { display: flex; align-items: flex-start; gap: 56px; padding: 0 56px; will-change: transform; }
 /* 輪播進出場的那兩張一定會被畫面邊緣切開,加漸層讓它變成淡出而不是被切一刀。
    用蓋一層底色的漸層而不是 mask:mask 會透出嵌它的那一頁的底色(簡報 iframe 是白的),
    跟畫廊自己的米色對不起來。 */
