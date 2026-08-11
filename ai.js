@@ -286,6 +286,19 @@ function textOf(m) { return (typeof m.content === 'string' ? m.content : '').tri
 function writerBrief(prompt, existing) { // 編劇的 user 訊息;內建「劇本強化」與「複製 prompt 外部產生」共用同一份,避免漂移
   return '需求:' + prompt + (existing ? '\n\n既有劇本(在此基礎上強化:保留好的部分、針對需求與弱點改寫,輸出完整新版。**強化是讓每一則更有力,不是把劇本加長**;該砍的鋪陳就砍掉,總長仍要控制在 40 則以內):\n' + existing : '');
 }
+// 六項分數本來只算在總分裡、從來沒印出來,現場看到的只有一個數字。
+// 「六項評分、不及格退稿」是這條管線最值得看的地方,不攤開等於白做。
+const CRITIC_ITEMS = [['arc', '劇情弧'], ['voice', '角色'], ['form', '形式'], ['pacing', '節奏'], ['real', '真實'], ['share', '傳播']];
+function scoreLine(scores) {
+  if (!scores) return '';
+  return '　' + CRITIC_ITEMS.map(([k, label]) => `${label} ${typeof scores[k] === 'number' ? scores[k] : '?'}`).join('　');
+}
+function weakItems(scores) { // 哪幾項低於 6 —— 退件的真正理由
+  if (!scores) return '';
+  const bad = CRITIC_ITEMS.filter(([k]) => typeof scores[k] === 'number' && scores[k] < 6).map(([, label]) => label);
+  return bad.length ? `　卡在:${bad.join('、')}低於 6` : '';
+}
+
 async function writeScreenplay(prompt, existing) { // 編劇→評審迴圈,及格(或 3 輪取最佳)才放行
   log('編劇撰寫劇本中…');
   const explicitW = writerCfg(); // 使用者另設的編劇/評審;沒設=null
@@ -308,8 +321,9 @@ async function writeScreenplay(prompt, existing) { // 編劇→評審迴圈,及�
     } catch (e) {}
     if (!verdict || typeof verdict.total !== 'number') { log('評審回覆無法解析,採用目前劇本', 'warn'); return script; }
     if (verdict.total > best.total) best = { script, total: verdict.total };
-    if (verdict.pass) { log(`劇本評分 ${verdict.total}/60${verdict.scores && typeof verdict.scores.share === 'number' ? `(傳播力 ${verdict.scores.share})` : ''},通過`, 'done'); return script; }
-    log(`劇本評分 ${verdict.total}/60 未達標(第 ${round}/3 輪):${String(verdict.feedback || '').slice(0, 80)}`, 'warn');
+    if (verdict.pass) { log(`劇本評分 ${verdict.total}/60 通過${scoreLine(verdict.scores)}`, 'done'); return script; }
+    log(`劇本評分 ${verdict.total}/60 未達標(第 ${round}/3 輪)${scoreLine(verdict.scores)}${weakItems(verdict.scores)}`, 'warn');
+    if (verdict.feedback) log(`評審意見:${String(verdict.feedback).slice(0, 200)}`, 'warn');
     if (round < 3) wmsgs.push({ role: 'user', content: '評審未通過(' + verdict.total + '/60)。依以下意見改寫整份劇本:\n' + (verdict.feedback || '') });
   }
   log(`三輪未達標,採用最高分劇本(${best.total}/60)`, 'warn');
