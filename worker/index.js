@@ -146,7 +146,12 @@ export default {
         messages: body.messages,
         max_tokens: Math.max(1, Math.min(+body.max_tokens || 8192, 8192)),
       };
-      if (/^glm-/.test(body.model)) clean.reasoning_effort = 'none'; // GLM 是思考型:不關掉會把預算全花在 reasoning、content 回空白
+      // 思考型模型要把 reasoning 關掉:我們只讀 message.content,思考文字落在 reasoning_content,
+      // 讀完就丟等於白花 token,GLM 更嚴重到會把預算全花光、content 回空白。
+      // 只能按前綴送:2026-08-11 實測那台上只有 glm-* 與 deepseek-v4-* 吃這個參數,
+      // 其餘八個(gpt-oss、qwen3.5、kimi、nemotron、minimax、gemma4、mistral-large)一律回
+      // litellm.UnsupportedParamsError 400,無差別送會把它們全打死。
+      if (/^(glm-|deepseek-)/.test(body.model)) clean.reasoning_effort = 'none';
       // 工具要帶過去。原本這條分支沒帶,所以執行 AI 一改用這邊的模型,tool-calling 迴圈就整個失效,
       // 它會改用散文回答。實測 gpt-oss:120b、glm-5.2、deepseek-v4-pro 在那台上都正常回 tool_calls。
       if (Array.isArray(body.tools)) clean.tools = body.tools;
