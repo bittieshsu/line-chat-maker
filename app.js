@@ -1245,7 +1245,7 @@ async function wallGalleryMode() {
   document.body.classList.add('wall-gallery');
   const rail = el('div', 'wall-rail');
   const empty = el('div', 'wall-cap');
-  empty.textContent = '還沒有人投稿';
+  empty.textContent = '載入中';
   document.body.append(rail, empty);
 
   const GAP = 24, COLS = 3, SPEED = 0.45; // px/frame,約 27px/秒,慢到可以讀完一則
@@ -1282,25 +1282,29 @@ async function wallGalleryMode() {
     else { off = 0; rail.style.transform = 'none'; }
   };
 
-  const add = async (s) => {
-    let incoming;
-    try { incoming = await wallFetchState(s.code); } catch (e) { return; }
+  // 先照清單順序把卡片位置佔好,內容等抓回來再填。一份一份 await 的話,作品本體要一個接一個
+  // 跑一趟短碼服務,七份就要二十秒才排得完,現場十幾份時投影片會空好幾十秒。
+  const add = (s) => {
     const card = el('div', 'wall-card');
     const wrap = el('div', 'wall-shot');
-    wrap.append(wallSnapshot(incoming));
     const cap = el('div', 'wall-cap');
     cap.textContent = (s.title || '未命名') + '・' + s.display_name;
     card.append(wrap, cap);
     rail.append(card);
     cards.set(s.code, card);
+    return wallFetchState(s.code)
+      .then((incoming) => { wrap.append(wallSnapshot(incoming)); })
+      .catch(() => { cards.delete(s.code); card.remove(); }); // 讀不回來就不要留一個空位
   };
 
   const poll = async () => {
     let next;
     try { next = await wallList(); } catch (e) { return; }
-    let grew = false;
-    for (const s of next) if (!cards.has(s.code)) { await add(s); grew = true; }
-    if (grew) relayout();
+    const jobs = [];
+    for (const s of next) if (!cards.has(s.code)) jobs.push(add(s));
+    if (jobs.length) { await Promise.all(jobs); relayout(); }
+    // 抓完之前不要寫「還沒有人投稿」,那是投影片上最不該出現的誤導
+    empty.textContent = cards.size ? '' : '還沒有人投稿';
     empty.style.display = cards.size ? 'none' : '';
   };
 
