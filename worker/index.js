@@ -58,13 +58,14 @@ export default {
         const imgIpLimit = +env.IMG_IP_DAILY || 2;
         const imgGlobalLimit = +env.IMG_GLOBAL_DAILY || 20;
         let ic;
-        try { ic = await bump(env.DB, day, 'img:' + ip, '__img_global__'); }
+        try { ic = await peek(env.DB, day, 'img:' + ip, '__img_global__'); }
         catch (e) {
           await env.DB.exec('CREATE TABLE IF NOT EXISTS lcm_quota (day TEXT NOT NULL, ip TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, ip))');
-          ic = await bump(env.DB, day, 'img:' + ip, '__img_global__');
+          ic = await peek(env.DB, day, 'img:' + ip, '__img_global__');
         }
-        if (ic.global > imgGlobalLimit) return err(429, '今天全站的 AI 補圖額度用完了(生圖走亞澤的 ChatGPT 額度,比文字貴)。明天再來。');
-        if (ic.ip > imgIpLimit) return err(429, `你今天的 AI 補圖額度用完了(每天 ${imgIpLimit} 次)。明天再來,或自己上傳圖片。`);
+        if (ic.global >= imgGlobalLimit) return err(429, '今天全站的 AI 補圖額度用完了(生圖走亞澤的 ChatGPT 額度,比文字貴)。明天再來。');
+        if (ic.ip >= imgIpLimit) return err(429, `你今天的 AI 補圖額度用完了(每天 ${imgIpLimit} 次)。明天再來,或自己上傳圖片。`);
+        await bump(env.DB, day, 'img:' + ip, '__img_global__'); // 真的要送出去了才計數
         const upstream = await fetch(imgBase + '/v1/images/jobs', {
           method: 'POST',
           headers: { 'content-type': 'application/json', ...imgHeaders },
@@ -109,25 +110,28 @@ export default {
     const ipLimit = +env.IP_DAILY || 60;
     const globalLimit = +env.GLOBAL_DAILY || 1200;
     let counts;
-    try { counts = await bump(env.DB, day, ip); }
+    try { counts = await peek(env.DB, day, ip); }
     catch (e) {
       await env.DB.exec('CREATE TABLE IF NOT EXISTS lcm_quota (day TEXT NOT NULL, ip TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, ip))');
-      counts = await bump(env.DB, day, ip);
+      counts = await peek(env.DB, day, ip);
     }
-    if (counts.global > globalLimit) return err(429, '今天全站的免費體驗額度被大家用完了(亞澤的信用卡在冒煙)。明天再來,或到連線設定填自己的 Groq API Key(免費申請,額度歸你)。');
-    if (counts.ip > ipLimit) return err(429, `你今天的免費體驗額度用完了(每天 ${ipLimit} 次 AI 呼叫,約 3 個作品)。想繼續:連線設定填自己的 Groq API Key(免費申請)。`);
+    if (counts.global >= globalLimit) return err(429, '今天全站的免費體驗額度被大家用完了(亞澤的信用卡在冒煙)。明天再來,或到連線設定填自己的 Groq API Key(免費申請,額度歸你)。');
+    if (counts.ip >= ipLimit) return err(429, `你今天的免費體驗額度用完了(每天 ${ipLimit} 次 AI 呼叫,約 3 個作品)。想繼續:連線設定填自己的 Groq API Key(免費申請)。`);
 
     // 編劇(GLM)另有一道更小的獨立額度:保護朋友的 key(Origin 標頭可偽造,共用的全站 1200 不夠緊)
     if (wantWriter) {
       let gc;
-      try { gc = await bump(env.DB, day, 'glm:' + ip, '__glm_global__'); }
+      try { gc = await peek(env.DB, day, 'glm:' + ip, '__glm_global__'); }
       catch (e) {
         await env.DB.exec('CREATE TABLE IF NOT EXISTS lcm_quota (day TEXT NOT NULL, ip TEXT NOT NULL, n INTEGER NOT NULL DEFAULT 0, PRIMARY KEY (day, ip))');
-        gc = await bump(env.DB, day, 'glm:' + ip, '__glm_global__');
+        gc = await peek(env.DB, day, 'glm:' + ip, '__glm_global__');
       }
-      if (gc.global > (+env.GLM_GLOBAL_DAILY || 200)) return err(429, '今天全站的免費「劇本強化」額度用完了。明天再來,或連線設定填自己的 API Key,或用「複製 prompt」貼到你自己的 AI。');
-      if (gc.ip > (+env.GLM_IP_DAILY || 20)) return err(429, '你今天的免費「劇本強化」額度用完了。想繼續:連線設定填自己的 API Key,或用「複製 prompt(免費)」貼到你自己的 AI。');
+      if (gc.global >= (+env.GLM_GLOBAL_DAILY || 200)) return err(429, '今天全站的免費「劇本強化」額度用完了。明天再來,或連線設定填自己的 API Key,或用「複製 prompt」貼到你自己的 AI。');
+      if (gc.ip >= (+env.GLM_IP_DAILY || 20)) return err(429, '你今天的免費「劇本強化」額度用完了。想繼續:連線設定填自己的 API Key,或用「複製 prompt(免費)」貼到你自己的 AI。');
+      await bump(env.DB, day, 'glm:' + ip, '__glm_global__'); // 真的要送出去了才計數
     }
+
+    await bump(env.DB, day, ip); // 兩道門都過了才計數
 
     // 鎖定 model 與欄位:這不是萬用 LLM 代理。編劇(glm-5.2)路由到 llm-share;其餘一律鎖 Groq。secret 沒設時退回 Groq。
     let clean, upURL, upHeaders;
@@ -166,4 +170,13 @@ async function bump(db, day, ip, globalKey) {
   const mine = await db.prepare(sql).bind(day, ip).first();
   const all = await db.prepare(sql).bind(day, globalKey || '__global__').first();
   return { ip: mine.n, global: all.n };
+}
+// 先看再加:被擋下來的呼叫不該吃掉額度。原本是 bump 完才檢查,結果撞到個人上限的人
+// 每多按一次都還在扣全站的量,幾個人狂按就能把別人的份也吃光,計數也會出現 6/2 這種矛盾數字。
+// 兩個請求同時通過檢查最多超收一次,那個代價遠小於被誤鎖。
+async function peek(db, day, ip, globalKey) {
+  const sql = 'SELECT n FROM lcm_quota WHERE day = ?1 AND ip = ?2';
+  const mine = await db.prepare(sql).bind(day, ip).first();
+  const all = await db.prepare(sql).bind(day, globalKey || '__global__').first();
+  return { ip: (mine && mine.n) || 0, global: (all && all.n) || 0 };
 }
