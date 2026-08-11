@@ -686,6 +686,14 @@ async function runFillImages() {
     const cells = slots.map((s, i) => ({ slot: s, prompt: String((plans.find((p) => p.cell === i + 1) || {}).prompt || s.hint || '簡潔可愛的插圖') }));
     const grid = planGrid(cells.length);
     const fillCells = cells.map((c) => ({ type: c.slot.type, msgIndex: c.slot.msgIndex, personIndex: c.slot.personIndex, prompt: c.prompt }));
+    // 提示先寫上去,不要等生圖成功。生圖是全站最容易失敗的一步(額度用完、服務忙),
+    // 而 applyGrid 只在成功時才寫 imgPrompt,失敗的話「重生」與「提示」兩顆鈕都不會出現,
+    // 接力出口正好在最需要的時候不存在。先寫提示,額度用完的人至少能複製出去自己生。
+    fillCells.forEach((c) => {
+      if (c.type === 'avatar') { const p = state.people[c.personIndex]; if (p) p.avatarPrompt = c.prompt; }
+      else { const m = state.messages[c.msgIndex]; if (m) m.imgPrompt = c.prompt; }
+    });
+    save(); render();
     log(`送出生圖(${grid.cols}×${grid.rows} 格盤)…`);
     const img = await generateBitmap(buildGridPrompt(grid, cells), grid.size, (jobId) => savePending(jobId, grid, fillCells));
     log('生成完成,切圖回填…');
