@@ -21,7 +21,9 @@
 
 走 llm-share 用的是 **Chat Completions**（`/v1/chat/completions`），不是 Responses API。思考型模型的思考文字會落在 `message.reasoning_content`，前端只讀 `message.content`，所以那段讀完就丟。
 
-因此對思考型模型要送 `reasoning_effort: "none"`，否則白花 token（GLM 更嚴重，會把預算全花在思考、`content` 回空白）。**但這個參數只能按前綴送**：2026-08-11 實測那台上只有 `glm-*` 與 `deepseek-v4-*` 接受，其餘（gpt-oss、qwen3.5、kimi、nemotron、minimax、gemma4、mistral-large）一律回 `litellm.UnsupportedParamsError` 400。無差別送會把它們全打死。
+因此對思考型模型要送 `reasoning_effort: "none"`，否則白花 token（GLM 更嚴重，會把預算全花在思考、`content` 回空白）。
+
+**這個參數必須逐一列出，不能用前綴猜**（`REASONING_OFF_MODELS`）。2026-08-11 逐一實測，接受的只有 `glm-5.2`、`deepseek-v4-flash:0731`、`deepseek-v4-pro`、`deepseek-v4-flash:preview`；其餘一律回 `litellm.UnsupportedParamsError` 400。**同系列不代表行為一致**：`glm-5.2` 吃、`glm-5.1` 不吃，一度寫成 `/^glm-/` 就把 `glm-5.1` 打死了。對方上下架或改版時要重測。
 
 名單走 llm-share 的那條是**別人的 key**。每 IP 的次數閘擋得住量，擋不住單價，所以名單刻意只放中小型模型；要加大模型先問過對方。另外那條的額度比較緊（預設每 IP 20 次），拿它跑「執行 AI」的話一個作品約 20 次呼叫就見底，要用得先把 `GLM_IP_DAILY` 調高。
 

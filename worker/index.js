@@ -148,10 +148,12 @@ export default {
       };
       // 思考型模型要把 reasoning 關掉:我們只讀 message.content,思考文字落在 reasoning_content,
       // 讀完就丟等於白花 token,GLM 更嚴重到會把預算全花光、content 回空白。
-      // 只能按前綴送:2026-08-11 實測那台上只有 glm-* 與 deepseek-v4-* 吃這個參數,
-      // 其餘八個(gpt-oss、qwen3.5、kimi、nemotron、minimax、gemma4、mistral-large)一律回
-      // litellm.UnsupportedParamsError 400,無差別送會把它們全打死。
-      if (/^(glm-|deepseek-)/.test(body.model)) clean.reasoning_effort = 'none';
+      // **必須逐一列出,不能用前綴猜。** 一度寫成 /^glm-/,結果 glm-5.1 不吃這個參數,每一次都 400。
+      // 2026-08-11 逐一實測:吃的只有下面這四個,其餘一律回 litellm.UnsupportedParamsError。
+      // 朋友那邊上下架或改版時要重測,別假設同系列行為一致。
+      const noThink = String(env.REASONING_OFF_MODELS || 'glm-5.2,deepseek-v4-flash:0731,deepseek-v4-pro,deepseek-v4-flash:preview')
+        .split(',').map((s) => s.trim());
+      if (noThink.includes(body.model)) clean.reasoning_effort = 'none';
       // 工具要帶過去。原本這條分支沒帶,所以執行 AI 一改用這邊的模型,tool-calling 迴圈就整個失效,
       // 它會改用散文回答。實測 gpt-oss:120b、glm-5.2、deepseek-v4-pro 在那台上都正常回 tool_calls。
       if (Array.isArray(body.tools)) clean.tools = body.tools;
