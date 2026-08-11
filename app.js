@@ -1258,7 +1258,9 @@ async function wallGalleryMode() {
     shot.style.transform = 'none';
     const r = shot.getBoundingClientRect();
     const cw = (innerWidth - GAP * (COLS + 1)) / COLS;
-    const k = Math.min(cw / (r.width || 1), (innerHeight - 96) / (r.height || 1));
+    // 扣掉的不只字幕:手機的陰影是 0 24px 60px,會畫到外框下面約 84px(隨 k 一起縮)。
+    // 只留字幕的高度的話,卡片垂直置中後底下不夠,陰影會在視窗底邊被切成一條硬邊。
+    const k = Math.min(cw / (r.width || 1), (innerHeight - 170) / (r.height || 1));
     shot.style.transform = 'scale(' + k.toFixed(3) + ')';
     wrap.style.width = Math.round(r.width * k) + 'px';
     wrap.style.height = Math.round(r.height * k) + 'px';

@@ -497,6 +497,7 @@ body.wall-gallery { margin: 0; background: #f4f2ee; height: 100vh; overflow: hid
 .wall-rail { display: flex; align-items: flex-start; gap: 24px; padding: 0 24px; will-change: transform; }
 .wall-card { flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
 .wall-card .wall-cap { font-size: 0.9rem; max-width: 100%; text-align: center; overflow-wrap: anywhere; }
-/* 手機用 transform 縮小,外框要自己吃掉縮小後的尺寸,不然卡片之間會空一大塊 */
-.wall-shot { overflow: hidden; }
+/* 手機用 transform 縮小,外框要自己吃掉縮小後的尺寸,不然卡片之間會空一大塊。
+   不能加 overflow:hidden,外框剛好等於手機的縮放後尺寸,手機的 box-shadow 畫在框外面,
+   一裁就變成四邊被切平的方框。陰影本來就該落在間距裡。 */
 .wall-shot > * { transform-origin: top left; }
