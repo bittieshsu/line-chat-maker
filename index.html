@@ -151,6 +151,9 @@
       <button id="ai-run" class="primary">開始製作 LINE 對話</button>
       <button id="ai-images" title="把腳本裡還沒有圖的貼圖/照片/頭像,一次生成回填(每日限量)">AI 補圖</button>
       <button id="ai-recover" hidden title="上次補圖逾時、但後端可能已生成好;按這裡把結果切回並回填">取回上次補圖</button>
+      <button id="ai-grid-prompt" hidden title="複製整張格盤的繪圖提示,拿去你自己的 ChatGPT／Gemini 生成(生圖額度用完時的接力做法)">複製格盤提示</button>
+      <button id="ai-grid-upload" hidden title="上傳你在外部生好的格盤圖,程式會照原本的切法切回各格並自動去背">上傳格盤圖</button>
+      <input id="file-grid" type="file" accept="image/*" hidden>
       <button id="ai-grid-dl" hidden title="補圖時 AI 一次生成的整張格盤圖;切回畫面的是各格切片,這裡下載的是原始那一張">下載原始格盤圖</button>
       <button id="ai-stop" hidden>停止</button>
     </div>

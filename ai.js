@@ -567,7 +567,7 @@ function applyGrid(img, grid, cells) { // 切圖回填共用:網格圖 → 各�
 }
 // ── 取回上次補圖:補圖送出 job 後把重建切圖所需的最小資訊存進 localStorage;逾時/報錯不清,事後可一鍵查後端把已生成的結果切回 ──
 const FILL_PENDING_KEY = 'lcm-fill-pending';
-function savePending(jobId, grid, cells) { // cells = 扁平版 [{type,msgIndex?,personIndex?,prompt}]
+function savePending(jobId, grid, cells, gridPrompt) { // cells = 扁平版 [{type,msgIndex?,personIndex?,prompt}]
   // 蓋上目標指紋:頭像用穩定的 personId(可抗人物重排)、訊息用 time/kind/personId/side,
   // 取回時若草稿已變動、指紋對不上就略過該格,避免把圖靜默貼到錯的訊息/人物上。
   const stamped = cells.map((c) => {
@@ -582,6 +582,7 @@ function savePending(jobId, grid, cells) { // cells = 扁平版 [{type,msgIndex?
       jobId,
       grid: { cols: grid.cols, rows: grid.rows },
       cells: stamped,
+      gridPrompt: gridPrompt || (readPending() || {}).gridPrompt || '', // 拿去外部生同一張格盤用的;第二次存(帶 jobId)時別把它弄丟
       msgLen: state.messages.length,
       peopleLen: state.people.length,
       ts: Date.now(),
@@ -592,9 +593,16 @@ function savePending(jobId, grid, cells) { // cells = 扁平版 [{type,msgIndex?
 function readPending() { try { return JSON.parse(localStorage.getItem(FILL_PENDING_KEY)); } catch (e) { return null; } }
 function clearPending() { try { localStorage.removeItem(FILL_PENDING_KEY); } catch (e) {} updateRecoverButton(); }
 function updateRecoverButton() { // 只在「當前草稿有 pending」時顯示
-  const b = $('#ai-recover'); if (!b) return;
   const rec = readPending();
-  b.hidden = !(rec && rec.draftId === currentId);
+  const mine = !!(rec && rec.draftId === currentId);
+  const b = $('#ai-recover');
+  // 取回=去後端問結果,沒送出過(沒有 jobId,例如額度直接被擋)就沒有東西可以取
+  if (b) b.hidden = !(mine && rec.jobId);
+  // 格盤接力:有計畫就能用,不管有沒有送出去過。額度用完的人靠這條把作品做完。
+  const p = $('#ai-grid-prompt'), u = $('#ai-grid-upload');
+  const on = mine && !!rec.gridPrompt;
+  if (p) p.hidden = !on;
+  if (u) u.hidden = !on;
 }
 async function probeFillJob(record) { // 單次查後端 job;succeeded→回 bitmap,failed/expired/404→dead,其餘→仍在生成
   if (record.provider === 'codex') {
@@ -694,8 +702,12 @@ async function runFillImages() {
       else { const m = state.messages[c.msgIndex]; if (m) m.imgPrompt = c.prompt; }
     });
     save(); render();
+    // 格盤提示也先存好。生圖被擋下來時,使用者還能把這張格盤的提示複製出去自己生,
+    // 生完上傳回來由程式切格,跟站內生成走的是同一份提示與同一套切法。
+    const gridPrompt = buildGridPrompt(grid, cells);
+    savePending(null, grid, fillCells, gridPrompt);
     log(`送出生圖(${grid.cols}×${grid.rows} 格盤)…`);
-    const img = await generateBitmap(buildGridPrompt(grid, cells), grid.size, (jobId) => savePending(jobId, grid, fillCells));
+    const img = await generateBitmap(gridPrompt, grid.size, (jobId) => savePending(jobId, grid, fillCells, gridPrompt));
     log('生成完成,切圖回填…');
     keepGrid(img); // 原圖用完就丟太可惜:那張一次生成、人物跨格一致的格盤圖本身就有看頭,留給使用者下載
     applyGrid(img, grid, fillCells);
@@ -710,8 +722,8 @@ async function runFillImages() {
     if (readPending()) log('後端可能仍在生成;稍後可按「取回上次補圖」把已生成的結果切回。', 'warn');
     // 失敗時一定要講出接力這條路。提示在送出生圖前就寫進草稿了,但那顆「提示」鈕要 hover
     // 才看得到,不講的話沒有人找得到,等於白做。
-    if (e.name !== 'AbortError') log('提示已經留在每一格了:滑到那張圖上按「提示」複製出去,用你自己的 ChatGPT／Gemini 生完,再點那張圖上傳回來。', 'warn');
-    toast('AI 補圖失敗;滑到圖上按「提示」可以複製出去自己生');
+    if (e.name !== 'AbortError') log('還有一條路:按「複製格盤提示」拿去你自己的 ChatGPT／Gemini 生一張同樣格數的圖,再按「上傳格盤圖」,程式會照原本的切法切回各格。想一格一格來的話,滑到圖上按「提示」也可以。', 'warn');
+    toast('AI 補圖失敗;可用「複製格盤提示」自己生完再上傳');
   }
   aborter = null; imgAbort = false;
   setBusy(false);
@@ -720,6 +732,38 @@ async function runFillImages() {
 }
 $('#ai-images').addEventListener('click', () => { if (!navigator.onLine) { toast('離線中,AI 補圖需要網路'); return; } runFillImages(); });
 $('#ai-recover').addEventListener('click', () => { if (!navigator.onLine) { toast('離線中;取回需要網路'); return; } recoverFill(); });
+
+// ── 格盤接力:額度用完時,把整張格盤的提示帶去外部生,生完上傳回來由程式切格 ──
+// 為什麼是整張格盤而不是一格一格:一次生成才有人物跨格一致,那正是格盤存在的理由;
+// 而且外部只要生一次。切法與去背沿用站內同一套,所以貼圖那幾格的綠底照樣會被去掉。
+$('#ai-grid-prompt').addEventListener('click', async () => {
+  const rec = readPending();
+  if (!rec || !rec.gridPrompt) { toast('先按一次「AI 補圖」,才會有格盤提示'); return; }
+  const tip = `已複製格盤提示;請在外部 AI 生成一張 ${rec.grid.cols}×${rec.grid.rows} 的方形格盤圖,再按「上傳格盤圖」`;
+  try { await navigator.clipboard.writeText(rec.gridPrompt); toast(tip); }
+  catch (e) { window.prompt('複製失敗,請自行選取複製:', rec.gridPrompt); }
+});
+$('#ai-grid-upload').addEventListener('click', () => $('#file-grid').click());
+$('#file-grid').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = ''; // 同一個檔案再選一次也要觸發
+  if (!f) return;
+  const rec = readPending();
+  if (!rec || rec.draftId !== currentId) { toast('沒有格盤資訊;請先按一次「AI 補圖」'); return; }
+  const before = structuredClone(scriptOf());
+  try {
+    const img = await createImageBitmap(f);
+    const v = LCM_PURE.validateFillCells(rec.cells, state.messages, state.people);
+    if (v.skipped) log(`有 ${v.skipped} 格的目標訊息／人物已變動,為避免貼錯已略過。`, 'warn');
+    keepGrid(img);
+    applyGrid(img, rec.grid, v.cells);
+    aiUndoStack.push({ draftId: currentId, snap: before });
+    if (aiUndoStack.length > 20) aiUndoStack.shift();
+    updateUndoButton(); save(); render(); clearPending();
+    log(`已把上傳的格盤切回 ${rec.cells.length - v.skipped} 格。不滿意可「還原上一步」。`, 'done');
+    toast('格盤已切回各格');
+  } catch (err) { log('切格失敗:' + err.message, 'err'); toast('這張圖切不開,確認是完整的格盤圖'); }
+});
 $('#ai-grid-dl').addEventListener('click', () => {
   if (!lastGridUrl) { toast('這一輪還沒有格盤圖;補一次圖之後就能下載'); return; }
   const a = document.createElement('a');
