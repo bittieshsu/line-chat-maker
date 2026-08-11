@@ -1259,7 +1259,12 @@ async function wallGalleryMode() {
     const scr = ph && ph.querySelector('.screen');
     if (!ph || !scr) return;
     ph.classList.add('fixedh');
-    scr.style.height = Math.round(scr.getBoundingClientRect().width * RATIO) + 'px';
+    // 不要量 getBoundingClientRect:這時候版面還沒定,量到的寬度會比實際大,高度就會算多。
+    // .phone 的寬度上限是固定的 24rem,直接釘住它,再扣掉機身邊框推算螢幕高度。
+    const W = 384; // 24rem
+    const pad = parseFloat(getComputedStyle(ph).paddingLeft) || 0;
+    ph.style.width = W + 'px';
+    scr.style.height = Math.round((W - pad * 2) * RATIO) + 'px';
     const chat = scr.querySelector('.line-chat');
     if (chat) chat.scrollTop = chat.scrollHeight;
   };
