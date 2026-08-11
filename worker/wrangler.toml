@@ -9,10 +9,11 @@ ALLOWED_ORIGINS = "https://yazelin.github.io"
 # 鎖定的 model(執行/工具呼叫;不接受前端指定其他 model)
 MODEL = "openai/gpt-oss-120b"
 # 會被路由到 llm-share(朋友的閘道)的 model 白名單,逗號分隔;不在清單上的一律走上面的 Groq。
-# 預設「劇本強化」送的是第一個(glm-5.2),其餘要在連線設定自己填 model 名才會用到。
-# 那台實際有十七個模型,這裡刻意只開中小型的:這是公開網站,打的是別人的 key,
-# 每 IP 20 次的閘擋得住量,但擋不住「每一次都打 675B」的單價。要加大模型先問過朋友。
-WRITER_MODELS = "glm-5.2,glm-5.1,gpt-oss:120b,gpt-oss:20b,deepseek-v4-flash:0731"
+# 預設「劇本強化」送的是 glm-5.2,其餘要在連線設定自己填 model 名才會用到。
+# 這裡放的是那台的全部模型(2026-08-11 以 `llmshare models` 取得)。朋友說水管夠大,不必為單價設限;
+# 真正的閘是下面的 GLM_IP_DAILY / GLM_GLOBAL_DAILY,那兩個才是保護他 key 的東西。
+# 那邊上下架模型時記得回來同步這一行,名字對不上就會被安靜改寫成 Groq。
+WRITER_MODELS = "nemotron-3-super,deepseek-v4-flash:0731,qwen3.5:397b,deepseek-v4-pro,kimi-k2.7-code,minimax-m2.7,minimax-m3,mistral-large-3:675b,glm-5.1,gpt-oss:20b,glm-5.2,gpt-oss:120b,nemotron-3-nano:30b,gemma4:31b,deepseek-v4-flash:preview,kimi-k2.6,nemotron-3-ultra"
 WRITER_MODEL = "glm-5.2" # 相容用:舊版只認這一個
 LLMSHARE_BASE = "https://llm-share.duotify.com/v1"
 # 編劇(GLM)獨立且更緊的每日額度,保護朋友的 key(Origin 可偽造,不能只靠共用的 GLOBAL_DAILY)。依朋友 key 容量調整。
