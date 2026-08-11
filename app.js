@@ -1249,6 +1249,20 @@ async function wallGalleryMode() {
   document.body.append(rail, empty);
 
   const GAP = 56, SPEED = 0.45; // px/frame,約 27px/秒,慢到可以讀完一則
+  const RATIO = 19.5 / 9; // 現代 iPhone 的螢幕長寬比(1179x2556)
+
+  // 作品原本的高度是被對話長度撐出來的(height: 'auto'),20 則就比 8 則高一截,
+  // 一排擺出來像不同型號的手機。畫廊一律改成固定高度、統一長寬比。
+  // 固定高度時聊天區會捲到底,看到的是最後幾則,跟真的聊天室一樣,笑點通常也在那裡。
+  const forceRatio = (shot) => {
+    const ph = shot.classList.contains('phone') ? shot : shot.querySelector('.phone');
+    const scr = ph && ph.querySelector('.screen');
+    if (!ph || !scr) return;
+    ph.classList.add('fixedh');
+    scr.style.height = Math.round(scr.getBoundingClientRect().width * RATIO) + 'px';
+    const chat = scr.querySelector('.line-chat');
+    if (chat) chat.scrollTop = chat.scrollHeight;
+  };
   const cards = new Map(); // code → 本尊卡片(複製品不進這裡)
   let setW = 0, off = 0, paused = false;
 
@@ -1299,7 +1313,11 @@ async function wallGalleryMode() {
     rail.append(card);
     cards.set(s.code, card);
     return wallFetchState(s.code)
-      .then((incoming) => { wrap.append(wallSnapshot(incoming)); })
+      .then((incoming) => {
+        const shot = wallSnapshot(incoming);
+        wrap.append(shot);
+        forceRatio(shot);
+      })
       .catch(() => { cards.delete(s.code); card.remove(); }); // 讀不回來就不要留一個空位
   };
 
