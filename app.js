@@ -160,6 +160,9 @@ async function boot() {
   if (q.get('wall') === 'gallery') wallGalleryMode();
   // ?code=xxx 自動帶入活動碼:現場少一個打錯字的環節。伺服器端照樣驗,前端只是省打字。
   if (q.get('code') && !q.get('wall')) wallPrefillCode(q.get('code'));
+  else if (!q.get('wall')) wallRestoreCode(); // 沒帶碼但這個分頁填過:重新整理不用再點一次連結
+  const codeEl = $('#wall-code');
+  if (codeEl) codeEl.addEventListener('input', () => wallSaveCode(codeEl.value));
 }
 
 const $ = (sel) => document.querySelector(sel);
@@ -470,6 +473,7 @@ function controls(m, i) {
   if (m.type === 'msg') {
     if ((m.kind === 'image' || m.kind === 'sticker') && m.imgPrompt && window.lcmRegenImage) btn('重生', 'AI 重畫這張圖(可還原)', () => window.lcmRegenImage(i));
     if ((m.kind === 'image' || m.kind === 'sticker') && m.img) btn('下載', '下載這張圖,改完可用「點擊換圖」重新上傳', () => downloadCellImage(m.img, m.kind === 'sticker' ? 'sticker-' + i + '.png' : 'image-' + i + '.jpg'));
+    if ((m.kind === 'image' || m.kind === 'sticker') && m.imgPrompt) btn('提示', '複製這格的繪圖提示,拿去外部 AI 生成,再點圖換上來(生圖額度用完時的接力做法)', () => copyImgPrompt(m));
     btn('⇄', '換邊', () => { if (m.side === 'left') { m.side = 'right'; m.read = m.read || ''; } else { m.side = 'left'; m.personId = m.personId || state.people[0].id; } save(); render(); });
     if ((m.kind || 'text') === 'text') btn('引', '加/移除引用回覆', () => { m.quote = m.quote ? null : { name: '某人', text: '被引用的訊息' }; save(); render(); });
     btn('心', '加/移除表情回應', () => { m.react = m.react && m.react.length ? null : ['😆']; save(); render(); });
@@ -1354,10 +1358,37 @@ async function wallGalleryMode() {
   setInterval(poll, 2000);
 }
 
+// 生圖額度用完還是要能把作品做完:把這格的繪圖提示複製出去,在外面生完再點圖換上來。
+// 貼圖那句刻意不照抄站內重生用的「背景整片純綠色」:站內生成後面接著自動去背,
+// 外面生的圖直接上傳不會經過那一步,叫他生純綠底只會得到一塊綠色方塊。
+function copyImgPrompt(m) {
+  const style = m.kind === 'sticker'
+    ? '。Q版可愛貼圖風格,主體置中,背景單一純色方便去背,無文字'
+    : '。真實手機隨手拍質感';
+  const full = (m.imgPrompt || '') + style;
+  const done = () => toast(m.kind === 'sticker'
+    ? '已複製提示;在外部 AI 生成後自己去背成透明 PNG,再點這張圖換上來'
+    : '已複製提示;在外部 AI 生成後,點這張圖換上來');
+  if (navigator.clipboard) navigator.clipboard.writeText(full).then(done, () => window.prompt('複製失敗,請自行選取複製:', full));
+  else window.prompt('請自行選取複製:', full);
+}
+
+// 活動碼記在 sessionStorage:重新整理還在,關掉分頁就沒。帶碼網址進站後碼會被拿掉,
+// 不記的話學員一按重新整理就要重新點一次連結。不用 localStorage 是因為 yazelin.github.io
+// 是所有 Pages 專案共用的同一份儲存,活動碼是授權用的東西,不該長期留在那裡。
+const WALL_CODE_KEY = 'lcm-wall-code';
+function wallSaveCode(v) { try { sessionStorage.setItem(WALL_CODE_KEY, String(v || '').trim().slice(0, 64)); } catch (e) {} }
+function wallRestoreCode() {
+  const el2 = $('#wall-code');
+  if (!el2 || el2.value) return;
+  try { const v = sessionStorage.getItem(WALL_CODE_KEY); if (v) el2.value = v; } catch (e) {}
+}
+
 function wallPrefillCode(code) { // 帶碼網址進來:填好活動碼、切到共享區、把投稿區展開
   const el2 = $('#wall-code');
   if (!el2) return;
   el2.value = String(code).trim().slice(0, 64);
+  wallSaveCode(el2.value);
   $('#wall-post').open = true;
   document.querySelector('.tabs [data-pane="wall"]').click();
   // 只拿掉 code,其他參數留著(?id= 之類還有人要用);碼不留在網址列,免得被順手截圖出去

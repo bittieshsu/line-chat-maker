@@ -405,7 +405,9 @@ async function refreshQuota() {
     const q = await r.json();
     const parts = [];
     if (cfg().provider === 'free') parts.push(`AI ${Math.max(0, q.ipLimit - q.ipUsed)}/${q.ipLimit}`);
-    if (cfg().provider === 'free' && typeof q.glmLimit === 'number') parts.push(`編劇 ${Math.max(0, q.glmLimit - q.glmUsed)}/${q.glmLimit}`);
+    // 看「編劇實際會走誰」,不是看執行走誰。編劇是獨立的一組設定,常見的組合是
+    // 執行填了自己的 key、編劇那欄還留在免費代理:額度照扣,但徽章不顯示,使用者完全看不到它在扣。
+    if ((writerCfg() || cfg()).provider === 'free' && typeof q.glmLimit === 'number') parts.push(`編劇 ${Math.max(0, q.glmLimit - q.glmUsed)}/${q.glmLimit}`);
     if (imgCfg().provider === 'free' && typeof q.imgLimit === 'number') parts.push(`圖 ${Math.max(0, q.imgLimit - q.imgUsed)}/${q.imgLimit}`);
     if (!parts.length) { badge.hidden = true; return; }
     badge.textContent = '今日剩:' + parts.join('・');
