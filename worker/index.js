@@ -12,6 +12,8 @@ export default {
       'access-control-allow-origin': okOrigin ? origin : 'null',
       'access-control-allow-methods': 'GET, POST, PATCH, DELETE, OPTIONS', // PATCH/DELETE 是共享區改標題與刪除用的
       'access-control-allow-headers': 'content-type, authorization',
+      // 前端要讀得到「這次到底轉去誰」。跨網域預設只看得到幾個安全標頭,不 expose 就讀不到。
+      'access-control-expose-headers': 'x-lcm-upstream',
       'access-control-max-age': '86400',
     };
     const err = (status, message) => new Response(JSON.stringify({ error: { message } }), { status, headers: { 'content-type': 'application/json', ...cors } });
@@ -168,7 +170,12 @@ export default {
     }
     const upstream = await fetch(upURL, { method: 'POST', headers: upHeaders, body: JSON.stringify(clean) });
     const text = await upstream.text();
-    return new Response(text, { status: upstream.status, headers: { 'content-type': 'application/json', ...cors } });
+    // 講出這次轉去誰。不講的話,使用者填的 model 被改寫成 Groq 時完全無感,
+    // 會以為自己在用某個模型,其實不是。前端把它印進 AI 紀錄。
+    return new Response(text, {
+      status: upstream.status,
+      headers: { 'content-type': 'application/json', 'x-lcm-upstream': wantWriter ? 'llmshare:' + clean.model : 'groq:' + clean.model, ...cors },
+    });
   },
 };
 

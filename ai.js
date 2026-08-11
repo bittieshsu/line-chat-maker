@@ -230,6 +230,20 @@ function updateUndoButton() { // 常駐但停用:隱藏式按鈕使用者找不�
   b.textContent = n > 1 ? `還原上一步(可退 ${n} 步)` : '還原上一步';
 }
 
+// 代理會在標頭講出這次轉去哪一條上游。填錯 model 時它會被安靜改寫成 Groq,
+// 不印出來的話使用者以為自己在用某個模型,其實不是。同一組只在變動時印一次,免得
+// 工具迴圈跑二十輪就洗出二十行。
+let lastUpstream = '';
+function reportUpstream(res, asked) {
+  const u = res.headers.get('x-lcm-upstream');
+  if (!u || u === lastUpstream) return;
+  lastUpstream = u;
+  const [where, got] = [u.slice(0, u.indexOf(':')), u.slice(u.indexOf(':') + 1)];
+  const label = where === 'llmshare' ? '朋友的閘道' : 'Groq';
+  if (got !== asked) log(`這次走 ${label}:你填的是「${asked}」,不在放行名單上,已改用「${got}」。`, 'warn');
+  else log(`這次走 ${label}:${got}`, 'prompt');
+}
+
 async function chat(msgs, force, noTools, useCfg) {
   const c = useCfg || cfg();
   const url = c.base.replace(/\/+$/, '') + '/chat/completions';
@@ -243,6 +257,7 @@ async function chat(msgs, force, noTools, useCfg) {
       ...(noTools ? {} : { tools: TOOL_DEFS.map((t) => ({ type: 'function', function: t })), tool_choice: force ? 'required' : 'auto' }),
     }),
   });
+  reportUpstream(res, c.model);
   const d = await res.json().catch(() => ({}));
   if (!res.ok) { // 錯誤沒帶 JSON 訊息時附上目標,好診斷「打錯地方」類問題(model 與 URL 都顯示)
     const e0 = Array.isArray(d) ? d[0] || {} : d; // Gemini 把錯誤包在陣列裡
