@@ -49,7 +49,7 @@ function scriptOf() { return { settings: state.settings, people: state.people, m
 // ── 工具(同一份定義供 agent 迴圈與 WebMCP 註冊) ──
 const TOOL_DEFS = [
   { name: 'get_script', description: '讀取目前完整腳本 JSON(圖片以 @imgN 佔位符表示)。', parameters: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'apply_script', description: "修改腳本並立即更新畫面:settings 淺合併、people 整組取代、messages 整列取代;三個欄位都可省略,只給要改的。每則訊息一定要有 type 欄位(不是 content/person 那種自創欄位),否則會被丟掉。", parameters: { type: 'object', properties: { settings: { type: 'object', description: "只放要改的欄位,例 { title: '群組名稱' }" }, people: { type: 'array', items: { type: 'object', required: ['id', 'name'], properties: { id: { type: 'string', description: 'messages[].personId 會引用這個值' }, name: { type: 'string' }, avatar: { type: 'string', description: "只接受 data: 開頭的內嵌圖;外部網址會被忽略成沒有頭像" } } } }, messages: { type: 'array', items: { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['msg', 'date', 'skip'], description: "msg=一則訊息;date=日期分隔線;skip=「⋯⋯(略)⋯⋯」省略記號" }, kind: { type: 'string', enum: ['text', 'image', 'sticker', 'voice', 'file'], description: '只有 type=msg 用,預設 text' }, side: { type: 'string', enum: ['left', 'right'], description: "right=自己,綠泡泡,不要給 personId;left=別人,要給 personId" }, text: { type: 'string', description: 'type=msg 且 kind=text 時是訊息內容;type=date 時是日期字串,例「7月17日 (四)」' }, personId: { type: 'string', description: '只有 side=left 要給,值必須對得上 people[].id' }, time: { type: 'string', description: "顯示時間,例「下午4:06」" }, read: { type: 'string', description: "只有 side=right 有意義,例「已讀」或「已讀 8」" } } } } }, additionalProperties: false } },
+  { name: 'apply_script', description: "修改腳本並立即更新畫面:settings 淺合併、people 整組取代、messages 整列取代;三個欄位都可省略,只給要改的。每則訊息一定要有 type 欄位(不是 content/person 那種自創欄位),否則會被丟掉。", parameters: { type: 'object', properties: { settings: { type: 'object', description: "只放要改的欄位,例 { title: '群組名稱' }" }, people: { type: 'array', items: { type: 'object', required: ['id', 'name'], properties: { id: { type: 'string', description: 'messages[].personId 會引用這個值' }, name: { type: 'string' }, avatar: { type: 'string', description: "留空。你產不出真的圖片:自己編的 base64 解碼後 IDAT 會斷,瀏覽器載不出來。外部網址也會被忽略。要頭像請叫使用者自己上傳,或用站內的「AI 補圖」生成" } } } }, messages: { type: 'array', items: { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['msg', 'date', 'skip'], description: "msg=一則訊息;date=日期分隔線;skip=「⋯⋯(略)⋯⋯」省略記號" }, kind: { type: 'string', enum: ['text', 'image', 'sticker', 'voice', 'file'], description: '只有 type=msg 用,預設 text' }, side: { type: 'string', enum: ['left', 'right'], description: "right=自己,綠泡泡,不要給 personId;left=別人,要給 personId" }, text: { type: 'string', description: 'type=msg 且 kind=text 時是訊息內容;type=date 時是日期字串,例「7月17日 (四)」' }, personId: { type: 'string', description: '只有 side=left 要給,值必須對得上 people[].id' }, time: { type: 'string', description: "顯示時間,例「下午4:06」" }, read: { type: 'string', description: "只有 side=right 有意義,例「已讀」或「已讀 8」" } } } } }, additionalProperties: false } },
   { name: 'append_messages', description: '在對話尾端加入訊息,畫面立即更新。每則一定要有 type 欄位。', parameters: { type: 'object', properties: { messages: { type: 'array', items: { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['msg', 'date', 'skip'], description: "msg=一則訊息;date=日期分隔線;skip=「⋯⋯(略)⋯⋯」省略記號" }, kind: { type: 'string', enum: ['text', 'image', 'sticker', 'voice', 'file'], description: '只有 type=msg 用,預設 text' }, side: { type: 'string', enum: ['left', 'right'], description: "right=自己,綠泡泡,不要給 personId;left=別人,要給 personId" }, text: { type: 'string', description: 'type=msg 且 kind=text 時是訊息內容;type=date 時是日期字串,例「7月17日 (四)」' }, personId: { type: 'string', description: '只有 side=left 要給,值必須對得上 people[].id' }, time: { type: 'string', description: "顯示時間,例「下午4:06」" }, read: { type: 'string', description: "只有 side=right 有意義,例「已讀」或「已讀 8」" } } } } }, required: ['messages'], additionalProperties: false } },
   { name: 'export_png', description: '把目前畫面匯出成 PNG(會觸發下載)。只在使用者明確要求匯出時使用。', parameters: { type: 'object', properties: {}, additionalProperties: false } },
 ];
@@ -76,6 +76,17 @@ function fixRefs() { // left 訊息的 personId 必須存在;沒人就補一位
   if (!state.people.length) state.people.push({ id: 'p1', name: '朋友', avatar: null });
   window.LCM_PURE.normalizeSides(state); // 「不是 right 就是 left」;缺的 personId 跟前一位左邊發話者
 }
+// 真的把 data: 圖丟給瀏覽器解一次。模型很愛編 base64,標頭抄得很像但影像資料是斷的,
+// 只檢查開頭是不是 data: 會讓破圖一路存進草稿。
+function imgLoads(src) {
+  return new Promise((resolve) => {
+    const im = new Image();
+    im.onload = () => resolve(im.naturalWidth > 0);
+    im.onerror = () => resolve(false);
+    im.src = src;
+  });
+}
+
 async function execTool(name, args) {
   if (name === 'get_script') return JSON.stringify(strip(scriptOf()));
   if (name === 'apply_script') {
@@ -84,13 +95,28 @@ async function execTool(name, args) {
       const tm = String(state.settings.title || '').match(/^(.*?)[  ]*[((](\d+)[))]\s*$/);
       if (tm && tm[1].trim()) { state.settings.title = tm[1].trim(); if (!(+state.settings.members) || +state.settings.members === +tm[2]) state.settings.members = +tm[2]; }
     }
-    if (Array.isArray(args.people)) state.people = rehydrate(args.people).filter((p) => p && p.id).map((p) => ({ id: String(p.id), name: String(p.name ?? '朋友'), avatar: typeof p.avatar === 'string' && p.avatar.startsWith('data:') ? p.avatar : null }));
+    let badAvatars = 0;
+    if (Array.isArray(args.people)) {
+      const raw = rehydrate(args.people).filter((p) => p && p.id);
+      // 只看開頭是不是 data: 不夠:模型會編出標頭正確、IDAT 卻斷掉的 base64,
+      // 存進去之後畫面就是一個載不出來的破圖。真的解一次,解不開就當沒有頭像。
+      const checked = await Promise.all(raw.map(async (p) => {
+        let av = typeof p.avatar === 'string' && p.avatar.startsWith('data:') ? p.avatar : null;
+        if (av && !(await imgLoads(av))) { av = null; badAvatars++; }
+        return { id: String(p.id), name: String(p.name ?? '朋友'), avatar: av };
+      }));
+      state.people = checked;
+    }
     if (Array.isArray(args.messages)) state.messages = sanitizeMessages(args.messages);
     fixRefs(); save(); render();
     // 全部被過濾掉還回 ok:true 的話,呼叫端會以為成功。外部 agent 常自創 {content, person} 這種欄位,
     // 一定要把「你送了幾則、我收下幾則」講清楚,它才有機會自己修正。
     const sent = Array.isArray(args.messages) ? args.messages.length : null;
     const res = { ok: true, people: state.people.length, messages: state.messages.length };
+    if (badAvatars) {
+      res.badAvatars = badAvatars;
+      res.avatarHint = '有 ' + badAvatars + ' 個頭像的 data: 圖解不開(自己編的 base64 沒有完整的影像資料),已當成沒有頭像。不要自己造圖,留空就好。';
+    }
     if (sent !== null && state.messages.length < sent) {
       res.ok = state.messages.length > 0;
       res.dropped = sent - state.messages.length;
