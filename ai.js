@@ -49,8 +49,8 @@ function scriptOf() { return { settings: state.settings, people: state.people, m
 // ── 工具(同一份定義供 agent 迴圈與 WebMCP 註冊) ──
 const TOOL_DEFS = [
   { name: 'get_script', description: '讀取目前完整腳本 JSON(圖片以 @imgN 佔位符表示)。', parameters: { type: 'object', properties: {}, additionalProperties: false } },
-  { name: 'apply_script', description: '修改腳本並立即更新畫面:settings 淺合併、people 整組取代、messages 整列取代;三個欄位都可省略,只給要改的。', parameters: { type: 'object', properties: { settings: { type: 'object', description: '只放要改的欄位' }, people: { type: 'array', items: { type: 'object' } }, messages: { type: 'array', items: { type: 'object' } } }, additionalProperties: false } },
-  { name: 'append_messages', description: '在對話尾端加入訊息,畫面立即更新。', parameters: { type: 'object', properties: { messages: { type: 'array', items: { type: 'object' } } }, required: ['messages'], additionalProperties: false } },
+  { name: 'apply_script', description: "修改腳本並立即更新畫面:settings 淺合併、people 整組取代、messages 整列取代;三個欄位都可省略,只給要改的。每則訊息一定要有 type 欄位(不是 content/person 那種自創欄位),否則會被丟掉。", parameters: { type: 'object', properties: { settings: { type: 'object', description: "只放要改的欄位,例 { title: '群組名稱' }" }, people: { type: 'array', items: { type: 'object', required: ['id', 'name'], properties: { id: { type: 'string', description: 'messages[].personId 會引用這個值' }, name: { type: 'string' }, avatar: { type: 'string', description: "只接受 data: 開頭的內嵌圖;外部網址會被忽略成沒有頭像" } } } }, messages: { type: 'array', items: { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['msg', 'date', 'skip'], description: "msg=一則訊息;date=日期分隔線;skip=「⋯⋯(略)⋯⋯」省略記號" }, kind: { type: 'string', enum: ['text', 'image', 'sticker', 'voice', 'file'], description: '只有 type=msg 用,預設 text' }, side: { type: 'string', enum: ['left', 'right'], description: "right=自己,綠泡泡,不要給 personId;left=別人,要給 personId" }, text: { type: 'string', description: 'type=msg 且 kind=text 時是訊息內容;type=date 時是日期字串,例「7月17日 (四)」' }, personId: { type: 'string', description: '只有 side=left 要給,值必須對得上 people[].id' }, time: { type: 'string', description: "顯示時間,例「下午4:06」" }, read: { type: 'string', description: "只有 side=right 有意義,例「已讀」或「已讀 8」" } } } } }, additionalProperties: false } },
+  { name: 'append_messages', description: '在對話尾端加入訊息,畫面立即更新。每則一定要有 type 欄位。', parameters: { type: 'object', properties: { messages: { type: 'array', items: { type: 'object', required: ['type'], properties: { type: { type: 'string', enum: ['msg', 'date', 'skip'], description: "msg=一則訊息;date=日期分隔線;skip=「⋯⋯(略)⋯⋯」省略記號" }, kind: { type: 'string', enum: ['text', 'image', 'sticker', 'voice', 'file'], description: '只有 type=msg 用,預設 text' }, side: { type: 'string', enum: ['left', 'right'], description: "right=自己,綠泡泡,不要給 personId;left=別人,要給 personId" }, text: { type: 'string', description: 'type=msg 且 kind=text 時是訊息內容;type=date 時是日期字串,例「7月17日 (四)」' }, personId: { type: 'string', description: '只有 side=left 要給,值必須對得上 people[].id' }, time: { type: 'string', description: "顯示時間,例「下午4:06」" }, read: { type: 'string', description: "只有 side=right 有意義,例「已讀」或「已讀 8」" } } } } }, required: ['messages'], additionalProperties: false } },
   { name: 'export_png', description: '把目前畫面匯出成 PNG(會觸發下載)。只在使用者明確要求匯出時使用。', parameters: { type: 'object', properties: {}, additionalProperties: false } },
 ];
 function sanitizeMessages(list) {
@@ -87,13 +87,30 @@ async function execTool(name, args) {
     if (Array.isArray(args.people)) state.people = rehydrate(args.people).filter((p) => p && p.id).map((p) => ({ id: String(p.id), name: String(p.name ?? '朋友'), avatar: typeof p.avatar === 'string' && p.avatar.startsWith('data:') ? p.avatar : null }));
     if (Array.isArray(args.messages)) state.messages = sanitizeMessages(args.messages);
     fixRefs(); save(); render();
-    return JSON.stringify({ ok: true, people: state.people.length, messages: state.messages.length });
+    // 全部被過濾掉還回 ok:true 的話,呼叫端會以為成功。外部 agent 常自創 {content, person} 這種欄位,
+    // 一定要把「你送了幾則、我收下幾則」講清楚,它才有機會自己修正。
+    const sent = Array.isArray(args.messages) ? args.messages.length : null;
+    const res = { ok: true, people: state.people.length, messages: state.messages.length };
+    if (sent !== null && state.messages.length < sent) {
+      res.ok = state.messages.length > 0;
+      res.dropped = sent - state.messages.length;
+      res.hint = "被丟掉的訊息缺少必填的 type 欄位。每則要長這樣:{ type: 'msg', side: 'right', text: '內容' },別人的訊息用 side: 'left' 並給對得上 people[].id 的 personId。";
+    }
+    return JSON.stringify(res);
   }
   if (name === 'append_messages') {
     if (!Array.isArray(args.messages)) throw new Error('messages 必須是陣列');
-    state.messages.push(...sanitizeMessages(args.messages));
+    const clean = sanitizeMessages(args.messages); const added = clean.length;
+    state.messages.push(...clean);
     fixRefs(); save(); render();
-    return JSON.stringify({ ok: true, messages: state.messages.length });
+    const before = state.messages.length - added;
+    const r2 = { ok: added > 0, messages: state.messages.length, added };
+    if (added < args.messages.length) {
+      r2.dropped = args.messages.length - added;
+      r2.hint = "被丟掉的訊息缺少必填的 type 欄位,每則要長這樣:{ type: 'msg', side: 'right', text: '內容' }。";
+    }
+    void before;
+    return JSON.stringify(r2);
   }
   if (name === 'export_png') { $('#export-png').click(); return JSON.stringify({ ok: true }); }
   throw new Error('未知工具:' + name);
