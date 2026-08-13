@@ -444,6 +444,9 @@ async function runAgent(prompt, screenplay, quick) {
           usedTool = true;
           if (name === 'apply_script' || name === 'append_messages') { mutated = true; batchMutated = true; }
         } catch (e) { out = JSON.stringify({ ok: false, error: e.message }); }
+        // dropped 原本只回給模型,畫面上只有一行「工具:xxx」。模型欄位填錯時使用者看到的是
+        // 「AI 說做好了但畫面沒動」,像當機。把丟掉幾則講出來,至少看得懂發生什麼事。
+        try { const r = JSON.parse(out); if (r.dropped) log(`這次送來的 ${r.dropped} 則被丟掉(欄位不合格式),畫面沒有變化。換一個執行模型再試。`, 'warn'); } catch (e) {}
         msgs.push({ role: 'tool', tool_call_id: call.id, name, content: out });
       }
       if (batchMutated && step < loopLimit - 1) { // 改完強制自審一輪(參考 zerotype 的 post-mutation review);微調查「有沒有多改」,大製作查劇情品質
