@@ -30,8 +30,8 @@ IP_DAILY = "150"
 GLOBAL_DAILY = "5000"
 # AI 補圖(codex-image-service,走站長 ChatGPT 額度):額度獨立於文字
 CODEX_IMAGE_BASE = "https://ching-tech.ddns.net/codex-image"
-IMG_IP_DAILY = "6"
-IMG_GLOBAL_DAILY = "200"
+IMG_IP_DAILY = "2"
+IMG_GLOBAL_DAILY = "20"
 
 # 共享區梯次代號(投稿與清單都用它);換梯次改這裡
 WALL_EVENT = "chat-2026-08-12"
