@@ -245,14 +245,15 @@ const WRITER_SYSTEM = `你是資深編劇,專為「LINE 對話截圖」這種形
 2. 逐則對話:誰說/內容(照記法)/時間/已讀狀態
 3. 標註高潮與轉折點在哪一則
 只輸出劇本文字,劇情要有起因、升溫、高潮、收尾;對話像真人打字。`;
-const CRITIC_SYSTEM = `你是嚴格的 LINE 對話劇本評審,標準是「能在社群瘋傳」。對劇本六項評分,各 0-10:
+const CRITIC_SYSTEM = `你是嚴格的 LINE 對話劇本評審,標準是「能在社群瘋傳」。對劇本七項評分,各 0-10:
 1 arc 劇情弧(起因→升溫→高潮→收尾完整) 2 voice 角色聲音(口氣一致且彼此區分)
 3 form 形式運用(已讀不回/時間差/日期分隔/貼圖/引用/react/draft 至少巧用三種且服務劇情)
 4 pacing 節奏(留白與密集交錯,高潮前有鋪陳) 5 real 真實感(像真人打字的口語與短句)
-6 share 傳播力:看完會想 tag 誰?有沒有共鳴點(「這就是我媽」「tag 你室友」)?最關鍵:有沒有一格明確的「截圖點」——觀眾最想單獨截下來傳的那一則。
+6 logic 情境合理:這件事在現實裡說不說得通?**最常見的破法是「人明明在同一個場合,卻用訊息互相描述現場」**——例如兩人同桌吃飯卻互傳自己盤子的照片、同一間辦公室面對面卻用 LINE 轉述剛剛發生的事、一起走在路上卻傳「你看那個」。這種畫面讀者一眼就出戲。也要查時間線(結帳了又繼續點餐)、人物知道他不該知道的事。**只要出現「同場合卻用訊息互傳現場」,logic 不得超過 3 且 pass=false**,feedback 要指出是哪幾則、該怎麼拆開(改成一人在現場一人不在,或改成事後回顧)。
+7 share 傳播力:看完會想 tag 誰?有沒有共鳴點(「這就是我媽」「tag 你室友」)?最關鍵:有沒有一格明確的「截圖點」——觀眾最想單獨截下來傳的那一則。
 平淡無起伏、只有寒暄問答、沒有任何意外或情緒轉折的劇本,arc 與 pacing 不得超過 6;純文字沒穿插貼圖/圖片/語音等非文字訊息的,form 不得超過 6;形式元素「為用而用」沒服務劇情的(例:草稿結尾與劇情無關、貼圖亂入),form 扣分;**草稿(draft)寫成對方的台詞而不是「自己」的,real 不得超過 3 且 pass=false**——輸入框是拿手機那個人的,看不到對方在打什麼,那是不可能出現的畫面,feedback 要指出該改成自己的話還是整個拿掉;劇情提到、討論或傳送某個視覺物件(畫作/截圖/照片/梗圖/表單…)卻沒有對應的[圖片]或[貼圖]訊息把它做出來、只用文字帶過的,form 不得超過 4 且整體 pass=false,feedback 要指出「那個東西該補成[圖片]或[貼圖]、補在哪一則」;沒有明確截圖點或共鳴對象模糊的,share 不得超過 6。
-只回傳 JSON:{"scores":{"arc":n,"voice":n,"form":n,"pacing":n,"real":n,"share":n},"total":n,"pass":true|false,"feedback":"具體可執行的修改指示,share 低分時要指出截圖點該設在哪"}
-pass 條件:total>=48 且每項>=6。`;
+只回傳 JSON:{"scores":{"arc":n,"voice":n,"form":n,"pacing":n,"real":n,"logic":n,"share":n},"total":n,"pass":true|false,"feedback":"具體可執行的修改指示,share 低分時要指出截圖點該設在哪"}
+pass 條件:total>=56 且每項>=6。`;
 const IDEAS = [ // 委託簡報式:只給主題+情緒目標,具體轉折留給編劇發明(寫太細它會照抄)
   ['情侶吵架和好', '情侶吵架和好,要高潮迭起,結局暖但過程虐,吵架的原因和破冰的方式由你發明'],
   ['家人的日常', '家人之間嘴硬心軟的日常,表面平淡結尾有後勁,誰跟誰、為了什麼事由你決定'],
@@ -343,7 +344,7 @@ function writerBrief(prompt, existing) { // 編劇的 user 訊息;內建「劇�
 }
 // 六項分數本來只算在總分裡、從來沒印出來,現場看到的只有一個數字。
 // 「六項評分、不及格退稿」是這條管線最值得看的地方,不攤開等於白做。
-const CRITIC_ITEMS = [['arc', '劇情弧'], ['voice', '角色'], ['form', '形式'], ['pacing', '節奏'], ['real', '真實'], ['share', '傳播']];
+const CRITIC_ITEMS = [['arc', '劇情弧'], ['voice', '角色'], ['form', '形式'], ['pacing', '節奏'], ['real', '真實'], ['logic', '合理'], ['share', '傳播']];
 function scoreLine(scores) {
   if (!scores) return '';
   return '　' + CRITIC_ITEMS.map(([k, label]) => `${label} ${typeof scores[k] === 'number' ? scores[k] : '?'}`).join('　');
@@ -376,12 +377,12 @@ async function writeScreenplay(prompt, existing) { // 編劇→評審迴圈,及�
     } catch (e) {}
     if (!verdict || typeof verdict.total !== 'number') { log('評審回覆無法解析,採用目前劇本', 'warn'); return script; }
     if (verdict.total > best.total) best = { script, total: verdict.total };
-    if (verdict.pass) { log(`劇本評分 ${verdict.total}/60 通過${scoreLine(verdict.scores)}`, 'done'); return script; }
-    log(`劇本評分 ${verdict.total}/60 未達標(第 ${round}/3 輪)${scoreLine(verdict.scores)}${weakItems(verdict.scores)}`, 'warn');
+    if (verdict.pass) { log(`劇本評分 ${verdict.total}/70 通過${scoreLine(verdict.scores)}`, 'done'); return script; }
+    log(`劇本評分 ${verdict.total}/70 未達標(第 ${round}/3 輪)${scoreLine(verdict.scores)}${weakItems(verdict.scores)}`, 'warn');
     if (verdict.feedback) log(`評審意見:${String(verdict.feedback).slice(0, 200)}`, 'warn');
-    if (round < 3) wmsgs.push({ role: 'user', content: '評審未通過(' + verdict.total + '/60)。依以下意見改寫整份劇本:\n' + (verdict.feedback || '') });
+    if (round < 3) wmsgs.push({ role: 'user', content: '評審未通過(' + verdict.total + '/70)。依以下意見改寫整份劇本:\n' + (verdict.feedback || '') });
   }
-  log(`三輪未達標,採用最高分劇本(${best.total}/60)`, 'warn');
+  log(`三輪未達標,採用最高分劇本(${best.total}/70)`, 'warn');
   return best.script;
 }
 
