@@ -17,7 +17,7 @@
 - `save()` 對外簽名不變(無參數呼叫);`state` 仍是全域可變綁定。
 - SKILL.md 記載的 `localStorage.setItem('lcm-state', ...)` 注入契約必須繼續可用。
 - 草稿絕不自動淘汰;IDB 失敗降級記憶體模式,不擋創作。
-- 驗收工具:`NODE_PATH=/home/ct/fb-photo-dl/node_modules node <script>`(Playwright);本機 server:`python3 -m http.server 8917 --directory /home/ct/line-chat-maker`。
+- 驗收工具:`NODE_PATH=<裝了 playwright 的 node_modules> node <script>`(Playwright);本機 server:`python3 -m http.server 8917 --directory <這個 repo>`。
 
 ---
 
@@ -160,8 +160,8 @@ const cur = (page) => page.evaluate(() => ({ id: localStorage.getItem('lcm-curre
 - [ ] **Step 2: 起 server、跑腳本,確認紅燈**
 
 ```bash
-python3 -m http.server 8917 --directory /home/ct/line-chat-maker &
-NODE_PATH=/home/ct/fb-photo-dl/node_modules node <scratchpad>/lcm-accept.js
+python3 -m http.server 8917 --directory <這個 repo> &
+NODE_PATH=<裝了 playwright 的 node_modules> node <scratchpad>/lcm-accept.js
 ```
 Expected: FAIL(情境 1:舊行為覆蓋,`MYWORK 必須還在` 斷言失敗,或 IDB 不存在)
 
@@ -316,7 +316,7 @@ $('#reset').addEventListener('click', () => { if (confirm('清空目前這份草
 - [ ] **Step 7: 跑驗收,情境 1/2/3/6/7/8 綠**
 
 ```bash
-NODE_PATH=/home/ct/fb-photo-dl/node_modules node <scratchpad>/lcm-accept.js
+NODE_PATH=<裝了 playwright 的 node_modules> node <scratchpad>/lcm-accept.js
 ```
 Expected: 情境 4(等 `.draft-item`)與 5(JPEG)仍紅,其餘 PASS。可先把 4/5 區塊暫時註記略過確認其餘全綠。
 
@@ -425,7 +425,7 @@ document.querySelector('.tabs [data-pane="drafts"]').addEventListener('click', r
 - [ ] **Step 4: 跑驗收,情境 4 轉綠(5 仍紅)**
 
 ```bash
-NODE_PATH=/home/ct/fb-photo-dl/node_modules node <scratchpad>/lcm-accept.js
+NODE_PATH=<裝了 playwright 的 node_modules> node <scratchpad>/lcm-accept.js
 ```
 
 - [ ] **Step 5: Commit**
@@ -508,7 +508,7 @@ git add sw.js README.md skills/line-chat-maker/SKILL.md && git commit -m "chore:
 - [ ] **Step 1: 完整驗收(全部 8 情境)**
 
 ```bash
-NODE_PATH=/home/ct/fb-photo-dl/node_modules node <scratchpad>/lcm-accept.js
+NODE_PATH=<裝了 playwright 的 node_modules> node <scratchpad>/lcm-accept.js
 ```
 Expected: `全綠:N 情境通過`(不含被合併計數的 1+6、2+7,共 6 個區塊、8 個 spec 驗收項)
 
