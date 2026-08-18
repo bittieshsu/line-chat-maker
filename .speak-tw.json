@@ -1,0 +1,4 @@
+{
+  "public": ["index.html", "verify.html", "demo.html", "README.md"],
+  "exclude": ["docs/", "skills/", "examples/", "test/"]
+}
