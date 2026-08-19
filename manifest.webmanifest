@@ -2,6 +2,7 @@
   "name": "LINE 對話製造機",
   "short_name": "對話製造機",
   "description": "免費、離線的 LINE 風格對話產生器:創意梗圖、產品展示、教學示意,僅供創作。",
+  "id": "./",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#faf9f7",
@@ -23,6 +24,22 @@
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "maskable"
+    }
+  ],
+  "screenshots": [
+    {
+      "src": "screenshots/mobile.webp",
+      "sizes": "390x844",
+      "type": "image/webp",
+      "form_factor": "narrow",
+      "label": "LINE 對話製造機 手機介面"
+    },
+    {
+      "src": "screenshots/desktop.webp",
+      "sizes": "1280x800",
+      "type": "image/webp",
+      "form_factor": "wide",
+      "label": "LINE 對話製造機 桌機介面"
     }
   ],
   "scope": "./"
